@@ -17,6 +17,12 @@
 - Created S3 bucket for audio storage
 - Generated first AI narrated Dengbej story
 
+## Step 4 – Public API Endpoint
+- Created Lambda Function URL
+- Enabled CORS
+- Exposed Dengbej AI backend through a public endpoint
+- Prepared backend for web interface integration
+
 ## Current Architecture
 
 User Input  
