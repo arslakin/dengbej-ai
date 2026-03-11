@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Dengbej AI</title>
+</head>
+
+<body>
+
+<h1>Dengbej AI Story Generator</h1>
+
+<textarea id="textInput" rows="10" cols="60" placeholder="Paste text here..."></textarea>
+
+<br><br>
+
+<button onclick="generateStory()">Generate Dengbej Story</button>
+
+<p id="summary"></p>
+
+<audio id="audioPlayer" controls></audio>
+
+<script>
+
+const lambdaURL = "PASTE_YOUR_LAMBDA_URL_HERE";
+
+async function generateStory() {
+
+    const text = document.getElementById("textInput").value;
+
+    const response = await fetch(lambdaURL, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ text: text })
+    });
+
+    const data = await response.json();
+    const result = JSON.parse(data.body);
+
+    document.getElementById("summary").innerText = result.summary;
+
+    const player = document.getElementById("audioPlayer");
+    player.src = result.audio_url;
+    player.play();
+}
+
+</script>
+
+</body>
+
+</html>
