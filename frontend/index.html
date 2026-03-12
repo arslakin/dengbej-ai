@@ -45,6 +45,7 @@
     audio {
       margin-top: 20px;
       display: block;
+      width: 400px;
     }
   </style>
 </head>
@@ -53,7 +54,7 @@
 
 <h1>Dengbej AI Story Generator</h1>
 
-<p>Paste a text and generate an AI storytelling summary.</p>
+<p>Paste text and generate an AI storytelling summary.</p>
 
 <textarea id="textInput" rows="10" placeholder="Paste text here..."></textarea>
 
@@ -72,16 +73,17 @@ const lambdaURL = "https://cjopy77iu4rrnlyzzgbk6uldd40hgqdf.lambda-url.us-east-1
 async function generateStory() {
 
     const text = document.getElementById("textInput").value;
+    const summaryElement = document.getElementById("summary");
+    const player = document.getElementById("audioPlayer");
 
     if (!text) {
         alert("Please paste some text first.");
         return;
     }
 
-    const summaryElement = document.getElementById("summary");
-    const player = document.getElementById("audioPlayer");
-
     summaryElement.innerText = "Generating story...";
+    player.pause();
+    player.src = "";
 
     try {
 
@@ -90,9 +92,7 @@ async function generateStory() {
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({
-                text: text
-            })
+            body: JSON.stringify({ text: text })
         });
 
         const data = await response.json();
@@ -110,11 +110,17 @@ async function generateStory() {
         summaryElement.innerText = result.summary;
 
         player.src = result.audio_url;
-        player.play();
+        player.load();
+
+        try {
+            await player.play();
+        } catch (e) {
+            console.log("Autoplay blocked. User can press play.");
+        }
 
     } catch (error) {
 
-        console.error("Error:", error);
+        console.error(error);
         summaryElement.innerText = "Error generating story. Check console.";
 
     }
