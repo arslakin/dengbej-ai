@@ -1,0 +1,7 @@
+# Copy this file to terraform.tfvars and customize values
+
+aws_region          = "us-east-1"
+project_name        = "dengbej-ai"
+environment         = "prod"
+s3_bucket_name      = "dengbej-ai-audio-storage-unique-name"  # Must be globally unique
+lambda_function_name = "dengbej-ai-story-generator"
