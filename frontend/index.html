@@ -44,6 +44,7 @@
 
     audio {
       margin-top: 20px;
+      display: block;
     }
   </style>
 </head>
@@ -77,7 +78,10 @@ async function generateStory() {
         return;
     }
 
-    document.getElementById("summary").innerText = "Generating story...";
+    const summaryElement = document.getElementById("summary");
+    const player = document.getElementById("audioPlayer");
+
+    summaryElement.innerText = "Generating story...";
 
     try {
 
@@ -95,18 +99,23 @@ async function generateStory() {
 
         console.log("Lambda response:", data);
 
-        const result = JSON.parse(data.body);
+        let result;
 
-        document.getElementById("summary").innerText = result.summary;
+        if (data.body) {
+            result = JSON.parse(data.body);
+        } else {
+            result = data;
+        }
 
-        const player = document.getElementById("audioPlayer");
+        summaryElement.innerText = result.summary;
+
         player.src = result.audio_url;
         player.play();
 
     } catch (error) {
 
         console.error("Error:", error);
-        document.getElementById("summary").innerText = "Error generating story.";
+        summaryElement.innerText = "Error generating story. Check console.";
 
     }
 }
