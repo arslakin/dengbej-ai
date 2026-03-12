@@ -3,15 +3,60 @@
 
 <head>
   <title>Dengbej AI</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background: #f4f4f4;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    textarea {
+      width: 100%;
+      max-width: 700px;
+      font-size: 16px;
+      padding: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #2a7ae2;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: #1d5fbf;
+    }
+
+    #summary {
+      margin-top: 20px;
+      font-size: 18px;
+      max-width: 700px;
+    }
+
+    audio {
+      margin-top: 20px;
+    }
+  </style>
 </head>
 
 <body>
 
 <h1>Dengbej AI Story Generator</h1>
 
-<textarea id="textInput" rows="10" cols="60" placeholder="Paste text here..."></textarea>
+<p>Paste a text and generate an AI storytelling summary.</p>
 
-<br><br>
+<textarea id="textInput" rows="10" placeholder="Paste text here..."></textarea>
+
+<br>
 
 <button onclick="generateStory()">Generate Dengbej Story</button>
 
@@ -27,22 +72,43 @@ async function generateStory() {
 
     const text = document.getElementById("textInput").value;
 
-    const response = await fetch(lambdaURL, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ text: text })
-    });
+    if (!text) {
+        alert("Please paste some text first.");
+        return;
+    }
 
-    const data = await response.json();
-    const result = JSON.parse(data.body);
+    document.getElementById("summary").innerText = "Generating story...";
 
-    document.getElementById("summary").innerText = result.summary;
+    try {
 
-    const player = document.getElementById("audioPlayer");
-    player.src = result.audio_url;
-    player.play();
+        const response = await fetch(lambdaURL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                text: text
+            })
+        });
+
+        const data = await response.json();
+
+        console.log("Lambda response:", data);
+
+        const result = JSON.parse(data.body);
+
+        document.getElementById("summary").innerText = result.summary;
+
+        const player = document.getElementById("audioPlayer");
+        player.src = result.audio_url;
+        player.play();
+
+    } catch (error) {
+
+        console.error("Error:", error);
+        document.getElementById("summary").innerText = "Error generating story.";
+
+    }
 }
 
 </script>
