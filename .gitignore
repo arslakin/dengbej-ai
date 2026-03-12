@@ -162,3 +162,4 @@ terraform.tfvars
 
 # macOS
 .DS_Store
+.vscode/
