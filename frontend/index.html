@@ -1,7 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dengbej AI</title>
 
   <style>
@@ -156,17 +158,27 @@
 <body>
 
 <div class="container">
+
   <h1>🎙️ Dengbej AI Story Generator</h1>
 
-  <p>Paste any text and transform it into an AI-narrated story inspired by the Kurdish dengbêj tradition.</p>
+  <p>
+    Paste any text and transform it into an AI-narrated story inspired by the Kurdish
+    <strong>dengbêj</strong> storytelling tradition.
+  </p>
 
-  <textarea id="textInput" rows="10" placeholder="Paste your article, story, or text here..."></textarea>
+  <textarea
+    id="textInput"
+    rows="10"
+    placeholder="Paste your article, story, or text here..."
+  ></textarea>
 
-  <button id="generateBtn" onclick="generateStory()">Generate Dengbej Story</button>
+  <button id="generateBtn" onclick="generateStory()">
+    Generate Dengbej Story
+  </button>
 
   <div id="loading" class="loading">
     <strong>⏳ Generating your story...</strong>
-    <p>This may take 10-15 seconds. Please wait.</p>
+    <p>This may take 10–15 seconds. Please wait.</p>
   </div>
 
   <div id="error" class="error"></div>
@@ -177,139 +189,159 @@
     <div class="audio-label">🔊 Listen to your story:</div>
     <audio id="audioPlayer" controls preload="metadata"></audio>
   </div>
+
 </div>
 
 <script>
 
-const lambdaURL = "https://cjopy77iu4rrnlyzzgbk6uldd40hgqdf.lambda-url.us-east-1.on.aws/";
+const lambdaURL =
+"https://cjopy77iu4rrnlyzzgbk6uldd40hgqdf.lambda-url.us-east-1.on.aws/";
 
 async function generateStory() {
-    const text = document.getElementById("textInput").value.trim();
-    const summaryElement = document.getElementById("summary");
-    const player = document.getElementById("audioPlayer");
-    const audioContainer = document.getElementById("audioContainer");
-    const loadingElement = document.getElementById("loading");
-    const errorElement = document.getElementById("error");
-    const generateBtn = document.getElementById("generateBtn");
 
-    // Validate input
-    if (!text) {
-        showError("Please paste some text first.");
-        return;
+  const text = document.getElementById("textInput").value.trim();
+  const summaryElement = document.getElementById("summary");
+  const player = document.getElementById("audioPlayer");
+  const audioContainer = document.getElementById("audioContainer");
+  const loadingElement = document.getElementById("loading");
+  const errorElement = document.getElementById("error");
+  const generateBtn = document.getElementById("generateBtn");
+
+  if (!text) {
+    showError("Please paste some text first.");
+    return;
+  }
+
+  if (text.length < 50) {
+    showError("Please provide at least 50 characters of text.");
+    return;
+  }
+
+  hideError();
+
+  summaryElement.classList.remove("active");
+  audioContainer.classList.remove("active");
+
+  loadingElement.classList.add("active");
+
+  generateBtn.disabled = true;
+  generateBtn.textContent = "Generating...";
+
+  player.pause();
+  player.src = "";
+
+  try {
+
+    const response = await fetch(lambdaURL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ text: text })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error: ${response.status}`);
     }
 
-    if (text.length < 50) {
-        showError("Please provide at least 50 characters of text.");
-        return;
+    const data = await response.json();
+    console.log("Lambda response:", data);
+
+    let result;
+
+    if (data.body) {
+      result = JSON.parse(data.body);
+    } else {
+      result = data;
     }
 
-    // Reset UI
-    hideError();
-    summaryElement.classList.remove("active");
-    audioContainer.classList.remove("active");
-    loadingElement.classList.add("active");
-    generateBtn.disabled = true;
-    generateBtn.textContent = "Generating...";
+    if (!result.summary || !result.audio_url) {
+      throw new Error("Invalid response from server");
+    }
 
-    // Stop any playing audio
-    player.pause();
-    player.src = "";
+    summaryElement.textContent = result.summary;
+    summaryElement.classList.add("active");
+
+    player.src = result.audio_url;
+
+    audioContainer.classList.add("active");
+
+    player.addEventListener(
+      "loadedmetadata",
+      () => console.log("Audio loaded"),
+      { once: true }
+    );
+
+    player.addEventListener(
+      "error",
+      () => showError("Audio failed to load. Try again in a few seconds."),
+      { once: true }
+    );
+
+    player.load();
 
     try {
-        const response = await fetch(lambdaURL, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ text: text })
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log("Lambda response:", data);
-
-        // Parse response (handle both direct and wrapped responses)
-        let result;
-        if (data.body) {
-            result = JSON.parse(data.body);
-        } else {
-            result = data;
-        }
-
-        // Validate response
-        if (!result.summary || !result.audio_url) {
-            throw new Error("Invalid response from server");
-        }
-
-        // Display summary
-        summaryElement.textContent = result.summary;
-        summaryElement.classList.add("active");
-
-        // Setup audio player
-        player.src = result.audio_url;
-        audioContainer.classList.add("active");
-
-        // Wait for audio to be ready
-        player.addEventListener('loadedmetadata', function() {
-            console.log("Audio loaded successfully");
-        }, { once: true });
-
-        player.addEventListener('error', function(e) {
-            console.error("Audio error:", e);
-            showError("Failed to load audio. The file may not be accessible yet. Please try the play button in a few seconds.");
-        }, { once: true });
-
-        // Load the audio
-        player.load();
-
-        // Try to autoplay (may be blocked by browser)
-        try {
-            await player.play();
-            console.log("Audio playing automatically");
-        } catch (e) {
-            console.log("Autoplay blocked. User needs to click play:", e.message);
-            showError("Audio is ready! Click the play button to listen.", "info");
-        }
-
-    } catch (error) {
-        console.error("Error:", error);
-        showError(`Error generating story: ${error.message}. Please check your connection and try again.`);
-    } finally {
-        loadingElement.classList.remove("active");
-        generateBtn.disabled = false;
-        generateBtn.textContent = "Generate Dengbej Story";
+      await player.play();
+    } catch (e) {
+      showError("Audio ready. Click play to listen.", "info");
     }
+
+  } catch (error) {
+
+    console.error(error);
+
+    showError(
+      "Error generating story. Please check your connection and try again."
+    );
+
+  } finally {
+
+    loadingElement.classList.remove("active");
+
+    generateBtn.disabled = false;
+
+    generateBtn.textContent = "Generate Dengbej Story";
+
+  }
+
 }
 
-function showError(message, type = "error") {
-    const errorElement = document.getElementById("error");
-    errorElement.textContent = message;
-    errorElement.classList.add("active");
-    
-    if (type === "info") {
-        errorElement.style.background = "#e3f2fd";
-        errorElement.style.borderLeftColor = "#2196f3";
-        errorElement.style.color = "#1565c0";
-    } else {
-        errorElement.style.background = "#ffebee";
-        errorElement.style.borderLeftColor = "#f44336";
-        errorElement.style.color = "#c62828";
-    }
+function showError(message, type="error") {
+
+  const errorElement = document.getElementById("error");
+
+  errorElement.textContent = message;
+
+  errorElement.classList.add("active");
+
+  if (type === "info") {
+    errorElement.style.background = "#e3f2fd";
+    errorElement.style.borderLeftColor = "#2196f3";
+    errorElement.style.color = "#1565c0";
+  } else {
+    errorElement.style.background = "#ffebee";
+    errorElement.style.borderLeftColor = "#f44336";
+    errorElement.style.color = "#c62828";
+  }
+
 }
 
 function hideError() {
-    const errorElement = document.getElementById("error");
-    errorElement.classList.remove("active");
+
+  const errorElement = document.getElementById("error");
+
+  errorElement.classList.remove("active");
+
 }
 
-// Allow Enter key to submit (with Ctrl/Cmd)
-document.getElementById("textInput").addEventListener("keydown", function(e) {
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-        generateStory();
-    }
+document
+.getElementById("textInput")
+.addEventListener("keydown", function(e) {
+
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+    generateStory();
+  }
+
 });
 
 </script>
