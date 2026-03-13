@@ -50,7 +50,7 @@ def lambda_handler(event, context):
 
         print("Generating audio")
 
-        audio_stream = synthesize_speech(kurdish_text)
+        audio_stream = synthesize_speech(english_summary)
 
         print("Uploading to S3")
 

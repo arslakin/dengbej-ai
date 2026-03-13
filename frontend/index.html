@@ -204,8 +204,9 @@
   <h1>🎙️ Dengbej AI Story Generator</h1>
 
   <p>
-    Paste text or provide an article URL to transform it into an AI-narrated Kurdish story 
-    inspired by the <strong>dengbêj</strong> storytelling tradition.
+    Paste text or provide an article URL to transform it into a bilingual story 
+    inspired by the <strong>dengbêj</strong> storytelling tradition. 
+    Get both English and Kurdish versions with English audio narration.
   </p>
 
   <label for="urlInput">Article URL (optional):</label>
@@ -227,8 +228,8 @@
   </button>
 
   <div id="loading" class="loading">
-    <strong>⏳ Generating your story...</strong>
-    <p>Fetching article, translating to Kurdish, and generating audio. This may take 15–20 seconds.</p>
+    <strong>⏳ Generating your bilingual story...</strong>
+    <p>Creating English summary, translating to Kurdish, and generating English audio narration. This may take 15–20 seconds.</p>
   </div>
 
   <div id="error" class="error"></div>
@@ -241,7 +242,7 @@
   </div>
 
   <div id="audioContainer" class="audio-container">
-    <div class="audio-label">🔊 Listen to your Kurdish story:</div>
+    <div class="audio-label">🔊 Listen to the English narration:</div>
     <audio id="audioPlayer" controls preload="metadata"></audio>
   </div>
 
@@ -358,7 +359,7 @@ async function generateStory() {
     try {
       await player.play();
     } catch (e) {
-      showError("Audio ready. Click play to listen to the Kurdish narration.", "info");
+      showError("Audio ready. Click play to listen to the English narration.", "info");
     }
 
   } catch (error) {

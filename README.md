@@ -10,15 +10,17 @@ Dengbêj is a traditional Kurdish oral storytelling art form where storytellers 
 
 Dengbej AI takes any text input and:
 1. Summarizes it into a compelling short story using AI
-2. Converts the summary into natural-sounding speech
-3. Delivers an audio file you can listen to immediately
+2. Translates the summary into Kurdish (Kurmanji dialect)
+3. Converts the English summary into natural-sounding speech
+4. Delivers both text versions and audio you can listen to immediately
 
-Perfect for turning long articles, blog posts, or documents into quick audio summaries.
+Perfect for turning long articles, blog posts, or documents into bilingual audio summaries.
 
 ## Features
 
 - **AI-Powered Summarization** – Intelligent text condensation using Amazon Bedrock (Claude 3.5 Haiku)
-- **Natural Voice Narration** – High-quality text-to-speech with Amazon Polly
+- **Bilingual Output** – Get both English and Kurdish (Kurmanji) text versions
+- **Natural Voice Narration** – High-quality English text-to-speech with Amazon Polly
 - **Instant Audio Generation** – Get your story in seconds
 - **Serverless Architecture** – Scalable, cost-effective AWS infrastructure
 - **Simple Web Interface** – No installation required, just paste and listen
@@ -39,10 +41,10 @@ Perfect for turning long articles, blog posts, or documents into quick audio sum
          │
          ├──→ Amazon Bedrock (Claude 3.5 Haiku)
          │    • Text summarization
-         │    • Story generation
+         │    • Kurdish translation
          │
          ├──→ Amazon Polly
-         │    • Text-to-speech synthesis
+         │    • English text-to-speech
          │    • Audio generation
          │
          └──→ Amazon S3
@@ -110,7 +112,8 @@ Perfect for turning long articles, blog posts, or documents into quick audio sum
 2. Paste any text into the text area (article, blog post, story, etc.)
 3. Click "Generate Dengbej Story"
 4. Wait a few seconds for AI processing
-5. Read the generated summary and listen to the audio narration
+5. Read both the English summary and Kurdish translation
+6. Listen to the English audio narration
 
 ## Project Structure
 
