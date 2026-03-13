@@ -15,7 +15,7 @@ This Terraform configuration creates:
 ## Prerequisites
 
 1. **AWS Account** with access to:
-   - Amazon Bedrock (Claude Haiku model enabled)
+   - Amazon Bedrock (Claude 3.5 Haiku model enabled)
    - AWS Lambda
    - Amazon Polly
    - Amazon S3
@@ -36,7 +36,7 @@ This Terraform configuration creates:
 
 4. **Enable Amazon Bedrock**
    - Go to AWS Console → Bedrock
-   - Request access to Claude 3 Haiku model
+   - Request access to Claude 3.5 Haiku model
    - Wait for approval (usually instant)
 
 ## Quick Start
@@ -143,7 +143,7 @@ terraform destroy
 Approximate monthly costs (assuming 1000 stories/month):
 
 - Lambda: ~$0.20 (first 1M requests free)
-- Bedrock (Claude Haiku): ~$0.25
+- Bedrock (Claude 3.5 Haiku): ~$0.25
 - Polly: ~$16
 - S3 Storage: ~$0.50 (for 20GB)
 - S3 Requests: ~$0.01
@@ -154,7 +154,7 @@ Approximate monthly costs (assuming 1000 stories/month):
 
 ### Bedrock Access Denied
 
-Enable the Claude 3 Haiku model in AWS Bedrock console:
+Enable the Claude 3.5 Haiku model in AWS Bedrock console:
 ```bash
 aws bedrock list-foundation-models --region us-east-1
 ```
