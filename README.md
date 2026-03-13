@@ -17,7 +17,7 @@ Perfect for turning long articles, blog posts, or documents into quick audio sum
 
 ## Features
 
-- **AI-Powered Summarization** – Intelligent text condensation using Amazon Bedrock (Claude Haiku)
+- **AI-Powered Summarization** – Intelligent text condensation using Amazon Bedrock (Claude 3.5 Haiku)
 - **Natural Voice Narration** – High-quality text-to-speech with Amazon Polly
 - **Instant Audio Generation** – Get your story in seconds
 - **Serverless Architecture** – Scalable, cost-effective AWS infrastructure
@@ -37,7 +37,7 @@ Perfect for turning long articles, blog posts, or documents into quick audio sum
 │  Function URL   │
 └────────┬────────┘
          │
-         ├──→ Amazon Bedrock (Claude Haiku)
+         ├──→ Amazon Bedrock (Claude 3.5 Haiku)
          │    • Text summarization
          │    • Story generation
          │
@@ -59,7 +59,7 @@ Perfect for turning long articles, blog posts, or documents into quick audio sum
 
 ### Backend (AWS)
 - **AWS Lambda** – Serverless compute
-- **Amazon Bedrock** – AI/ML models (Claude Haiku)
+- **Amazon Bedrock** – AI/ML models (Claude 3.5 Haiku)
 - **Amazon Polly** – Neural text-to-speech
 - **Amazon S3** – Object storage
 - **Lambda Function URLs** – Public HTTP endpoint
@@ -71,7 +71,7 @@ Perfect for turning long articles, blog posts, or documents into quick audio sum
 
 ### Prerequisites
 - AWS Account with access to:
-  - Amazon Bedrock (Claude Haiku model enabled)
+  - Amazon Bedrock (Claude 3.5 Haiku model enabled)
   - AWS Lambda
   - Amazon Polly
   - Amazon S3

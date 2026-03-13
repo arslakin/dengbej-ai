@@ -13,7 +13,7 @@ s3_client = boto3.client('s3', region_name=os.environ.get('AWS_REGION', 'us-east
 
 # Configuration
 S3_BUCKET = os.environ.get('S3_BUCKET_NAME', 'dengbej-ai-audio')
-MODEL_ID = 'anthropic.claude-3-haiku-20240307-v1:0'
+MODEL_ID = 'anthropic.claude-3-5-haiku-20241022-v1:0'
 MAX_ARTICLE_LENGTH = 8000
 
 
