@@ -97,3 +97,4 @@ terraform.tfvars
 *.tgz
 *.pid
 *.seed*.so
+*.so
