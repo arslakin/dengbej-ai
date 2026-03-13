@@ -33,6 +33,27 @@
       margin-top: 0;
     }
 
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #555;
+    }
+
+    input[type="url"] {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      border: 2px solid #ddd;
+      border-radius: 4px;
+      margin-bottom: 15px;
+    }
+
+    input[type="url"]:focus {
+      outline: none;
+      border-color: #2a7ae2;
+    }
+
     textarea {
       width: 100%;
       font-size: 16px;
@@ -111,6 +132,27 @@
       display: block;
     }
 
+    #kurdishText {
+      display: none;
+      margin-top: 20px;
+      padding: 15px;
+      background: #fff3e0;
+      border-radius: 4px;
+      border-left: 4px solid #ff9800;
+    }
+
+    #kurdishText .label {
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #e65100;
+    }
+
+    #kurdishContent {
+      line-height: 1.6;
+      color: #333;
+      font-size: 16px;
+    }
+
     .audio-container {
       margin-top: 20px;
       padding: 20px;
@@ -162,10 +204,18 @@
   <h1>🎙️ Dengbej AI Story Generator</h1>
 
   <p>
-    Paste any text and transform it into an AI-narrated story inspired by the Kurdish
-    <strong>dengbêj</strong> storytelling tradition.
+    Paste text or provide an article URL to transform it into an AI-narrated Kurdish story 
+    inspired by the <strong>dengbêj</strong> storytelling tradition.
   </p>
 
+  <label for="urlInput">Article URL (optional):</label>
+  <input 
+    type="url" 
+    id="urlInput" 
+    placeholder="https://example.com/article"
+  />
+
+  <label for="textInput">Or paste text directly:</label>
   <textarea
     id="textInput"
     rows="10"
@@ -178,15 +228,20 @@
 
   <div id="loading" class="loading">
     <strong>⏳ Generating your story...</strong>
-    <p>This may take 10–15 seconds. Please wait.</p>
+    <p>Fetching article, translating to Kurdish, and generating audio. This may take 15–20 seconds.</p>
   </div>
 
   <div id="error" class="error"></div>
 
   <div id="summary"></div>
 
+  <div id="kurdishText">
+    <div class="label">📖 Kurdish Translation (Kurmanji):</div>
+    <div id="kurdishContent"></div>
+  </div>
+
   <div id="audioContainer" class="audio-container">
-    <div class="audio-label">🔊 Listen to your story:</div>
+    <div class="audio-label">🔊 Listen to your Kurdish story:</div>
     <audio id="audioPlayer" controls preload="metadata"></audio>
   </div>
 
@@ -200,19 +255,23 @@ const lambdaURL =
 async function generateStory() {
 
   const text = document.getElementById("textInput").value.trim();
+  const url = document.getElementById("urlInput").value.trim();
   const summaryElement = document.getElementById("summary");
+  const kurdishTextElement = document.getElementById("kurdishText");
+  const kurdishContentElement = document.getElementById("kurdishContent");
   const player = document.getElementById("audioPlayer");
   const audioContainer = document.getElementById("audioContainer");
   const loadingElement = document.getElementById("loading");
   const errorElement = document.getElementById("error");
   const generateBtn = document.getElementById("generateBtn");
 
-  if (!text) {
-    showError("Please paste some text first.");
+  // Validate input
+  if (!text && !url) {
+    showError("Please provide either a URL or paste some text.");
     return;
   }
 
-  if (text.length < 50) {
+  if (text && text.length < 50 && !url) {
     showError("Please provide at least 50 characters of text.");
     return;
   }
@@ -220,6 +279,7 @@ async function generateStory() {
   hideError();
 
   summaryElement.classList.remove("active");
+  kurdishTextElement.style.display = "none";
   audioContainer.classList.remove("active");
 
   loadingElement.classList.add("active");
@@ -232,12 +292,20 @@ async function generateStory() {
 
   try {
 
+    // Prepare request body
+    const requestBody = {};
+    if (url) {
+      requestBody.url = url;
+    } else {
+      requestBody.text = text;
+    }
+
     const response = await fetch(lambdaURL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ text: text })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
@@ -259,8 +327,15 @@ async function generateStory() {
       throw new Error("Invalid response from server");
     }
 
-    summaryElement.textContent = result.summary;
+    // Display English summary
+    summaryElement.innerHTML = `<strong>📝 English Summary:</strong><br><br>${result.summary}`;
     summaryElement.classList.add("active");
+
+    // Display Kurdish translation
+    if (result.kurdish_text) {
+      kurdishContentElement.textContent = result.kurdish_text;
+      kurdishTextElement.style.display = "block";
+    }
 
     player.src = result.audio_url;
 
@@ -283,7 +358,7 @@ async function generateStory() {
     try {
       await player.play();
     } catch (e) {
-      showError("Audio ready. Click play to listen.", "info");
+      showError("Audio ready. Click play to listen to the Kurdish narration.", "info");
     }
 
   } catch (error) {
@@ -291,7 +366,7 @@ async function generateStory() {
     console.error(error);
 
     showError(
-      "Error generating story. Please check your connection and try again."
+      `Error generating story: ${error.message}. Please check your connection and try again.`
     );
 
   } finally {

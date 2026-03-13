@@ -5,11 +5,13 @@ AWS Lambda function that powers the Dengbej AI storytelling platform.
 ## Overview
 
 This Lambda function orchestrates the AI storytelling pipeline:
-1. Receives text input via HTTP POST
-2. Generates a story summary using Amazon Bedrock (Claude Haiku)
-3. Converts the summary to speech using Amazon Polly
-4. Stores the audio file in S3
-5. Returns the summary text and audio URL
+1. Receives text input or article URL via HTTP POST
+2. Fetches and extracts article content (if URL provided)
+3. Generates an English story summary using Amazon Bedrock (Claude Haiku)
+4. Translates the summary to Kurdish (Kurmanji dialect)
+5. Converts the Kurdish text to speech using Amazon Polly
+6. Stores the audio file in S3
+7. Returns the English summary, Kurdish translation, and audio URL
 
 ## Requirements
 
@@ -19,6 +21,12 @@ This Lambda function orchestrates the AI storytelling pipeline:
   - Amazon Bedrock (invoke model)
   - Amazon Polly (synthesize speech)
   - Amazon S3 (put object)
+
+## Dependencies
+
+- `boto3` - AWS SDK for Python
+- `requests` - HTTP library for fetching articles
+- `beautifulsoup4` - HTML parsing for article extraction
 
 ## Environment Variables
 
@@ -96,18 +104,27 @@ Required IAM policy for the Lambda execution role:
 
 ### POST Request
 
+**Option 1: Text Input**
 ```bash
 curl -X POST https://your-function-url.lambda-url.us-east-1.on.aws/ \
   -H "Content-Type: application/json" \
   -d '{"text": "Your article text here..."}'
 ```
 
+**Option 2: URL Input**
+```bash
+curl -X POST https://your-function-url.lambda-url.us-east-1.on.aws/ \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/article"}'
+```
+
 ### Response
 
 ```json
 {
-  "summary": "Generated story summary...",
-  "audio_url": "https://bucket.s3.amazonaws.com/stories/20240312_abc123.mp3",
+  "summary": "English story summary...",
+  "kurdish_text": "Kurdish (Kurmanji) translation...",
+  "audio_url": "https://bucket.s3.amazonaws.com/stories/dengbej_story_20240312_103000.mp3",
   "timestamp": "2024-03-12T10:30:00.000000"
 }
 ```
