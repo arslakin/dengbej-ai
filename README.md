@@ -1,5 +1,13 @@
 # Dengbej AI
 
+## Project Article
+
+This project was built for the **AWS 10,000 AIdeas Competition**. Read the full article on AWS Builder Center:
+
+[Dengbej AI – Kurdish Storytelling with Generative AI](https://builder.aws.com/content/3AtwFZmEnbM4cs3I7y25DHJyJlo/aideas-dengbej-ai-kurdish-storytelling-with-generative-ai)
+
+---
+
 Dengbej AI is an experimental storytelling platform inspired by the Kurdish dengbêj oral tradition. The project explores how AI can transform written articles into short narrated audio stories, making content more accessible and engaging through the power of voice.
 
 ## About Dengbêj
