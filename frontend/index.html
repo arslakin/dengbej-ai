@@ -7,191 +7,297 @@
   <title>Dengbej AI</title>
 
   <style>
-    * {
+    *, *::before, *::after {
       box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
 
     body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: #f4f4f4;
       min-height: 100vh;
+      padding: 24px 16px;
+      color: #1a1a1a;
+      -webkit-font-smoothing: antialiased;
     }
 
+    /* ── Card container ── */
     .container {
-      max-width: 800px;
+      max-width: 720px;
       margin: 0 auto;
-      background: white;
-      padding: 30px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      padding: 36px 32px;
     }
 
-    h1 {
-      color: #333;
-      margin-top: 0;
+    /* ── Header ── */
+    .header {
+      margin-bottom: 28px;
+    }
+
+    .header h1 {
+      font-size: clamp(22px, 5vw, 28px);
+      font-weight: 700;
+      color: #1a1a1a;
+      line-height: 1.2;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      font-size: 15px;
+      color: #555;
+      line-height: 1.6;
+    }
+
+    .header p strong {
+      color: #1a1a1a;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      border: none;
+      border-top: 1px solid #ebebeb;
+      margin: 24px 0;
+    }
+
+    /* ── Form elements ── */
+    .field {
+      margin-bottom: 20px;
     }
 
     label {
       display: block;
-      margin-bottom: 5px;
-      font-weight: bold;
-      color: #555;
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 8px;
     }
 
-    input[type="url"] {
-      width: 100%;
-      padding: 10px;
-      font-size: 16px;
-      border: 2px solid #ddd;
-      border-radius: 4px;
-      margin-bottom: 15px;
-    }
-
-    input[type="url"]:focus {
-      outline: none;
-      border-color: #2a7ae2;
-    }
-
+    input[type="url"],
     textarea {
       width: 100%;
-      font-size: 16px;
-      padding: 12px;
-      border: 2px solid #ddd;
-      border-radius: 4px;
-      resize: vertical;
       font-family: inherit;
+      font-size: 15px;
+      color: #1a1a1a;
+      background: #fafafa;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      padding: 12px 14px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      appearance: none;
+      -webkit-appearance: none;
     }
 
+    input[type="url"]:focus,
     textarea:focus {
       outline: none;
       border-color: #2a7ae2;
+      box-shadow: 0 0 0 3px rgba(42, 122, 226, 0.12);
+      background: #fff;
     }
 
-    button {
-      padding: 12px 24px;
+    textarea {
+      resize: vertical;
+      min-height: 160px;
+      line-height: 1.6;
+    }
+
+    /* ── Button ── */
+    button#generateBtn {
+      display: block;
+      width: 100%;
+      padding: 15px 24px;
+      font-family: inherit;
       font-size: 16px;
-      background-color: #2a7ae2;
-      color: white;
+      font-weight: 600;
+      color: #fff;
+      background: #2a7ae2;
       border: none;
-      border-radius: 4px;
+      border-radius: 8px;
       cursor: pointer;
-      margin-top: 10px;
-      transition: background-color 0.3s;
+      transition: background 0.2s, transform 0.1s;
+      margin-top: 4px;
     }
 
-    button:hover:not(:disabled) {
-      background-color: #1d5fbf;
+    button#generateBtn:hover:not(:disabled) {
+      background: #1d63c0;
     }
 
-    button:disabled {
-      background-color: #ccc;
+    button#generateBtn:active:not(:disabled) {
+      transform: scale(0.99);
+    }
+
+    button#generateBtn:disabled {
+      background: #b0c4de;
       cursor: not-allowed;
     }
 
+    /* ── Loading ── */
     .loading {
       display: none;
-      margin-top: 20px;
-      padding: 15px;
-      background: #e3f2fd;
-      border-left: 4px solid #2196f3;
-      border-radius: 4px;
+      margin-top: 24px;
+      padding: 16px 18px;
+      background: #eef4fd;
+      border-left: 4px solid #2a7ae2;
+      border-radius: 8px;
+      font-size: 15px;
+      color: #1a4a8a;
     }
 
     .loading.active {
-      display: block;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
     }
 
+    .loading-spinner {
+      font-size: 20px;
+      line-height: 1;
+      flex-shrink: 0;
+      animation: spin 1.5s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    .loading-text strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .loading-text p {
+      font-size: 13px;
+      color: #3a6aaa;
+      margin: 0;
+    }
+
+    /* ── Error / info banner ── */
     .error {
       display: none;
       margin-top: 20px;
-      padding: 15px;
-      background: #ffebee;
-      border-left: 4px solid #f44336;
-      border-radius: 4px;
-      color: #c62828;
+      padding: 14px 16px;
+      border-left: 4px solid #e53935;
+      border-radius: 8px;
+      background: #fff5f5;
+      color: #b71c1c;
+      font-size: 14px;
+      line-height: 1.5;
     }
 
     .error.active {
       display: block;
     }
 
-    #summary {
-      margin-top: 20px;
+    /* ── Output section ── */
+    .output-section {
+      margin-top: 28px;
+    }
+
+    .output-title {
       font-size: 18px;
-      line-height: 1.6;
-      color: #333;
-      padding: 15px;
-      background: #f9f9f9;
-      border-radius: 4px;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin-bottom: 16px;
+    }
+
+    /* English summary */
+    #summary {
       display: none;
+      padding: 20px;
+      background: #f9fafb;
+      border: 1.5px solid #e8e8e8;
+      border-radius: 10px;
+      font-size: 16px;
+      line-height: 1.75;
+      color: #222;
+      margin-bottom: 16px;
     }
 
     #summary.active {
       display: block;
     }
 
-    #kurdishText {
-      display: none;
-      margin-top: 20px;
-      padding: 15px;
-      background: #fff3e0;
-      border-radius: 4px;
-      border-left: 4px solid #ff9800;
+    #summary .section-label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #2a7ae2;
+      margin-bottom: 10px;
     }
 
-    #kurdishText .label {
-      font-weight: bold;
+    /* Kurdish translation */
+    #kurdishText {
+      display: none;
+      padding: 20px;
+      background: #fffbf5;
+      border: 1.5px solid #f0d9b5;
+      border-radius: 10px;
+      margin-bottom: 16px;
+    }
+
+    #kurdishText .section-label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #b45309;
       margin-bottom: 10px;
-      color: #e65100;
     }
 
     #kurdishContent {
-      line-height: 1.6;
-      color: #333;
       font-size: 16px;
+      line-height: 1.75;
+      color: #222;
     }
 
+    /* Audio player */
     .audio-container {
-      margin-top: 20px;
+      display: none;
       padding: 20px;
       background: #f0f7ff;
-      border-radius: 8px;
-      display: none;
+      border: 1.5px solid #c3daf9;
+      border-radius: 10px;
     }
 
     .audio-container.active {
       display: block;
     }
 
-    .audio-label {
-      font-weight: bold;
-      margin-bottom: 10px;
-      color: #333;
+    .audio-container .section-label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #1d63c0;
+      margin-bottom: 12px;
     }
 
     audio {
       width: 100%;
-      max-width: 100%;
+      display: block;
+      border-radius: 6px;
       outline: none;
     }
 
-    @media (max-width: 768px) {
+    /* ── Mobile ── */
+    @media (max-width: 600px) {
       body {
-        padding: 10px;
+        padding: 16px 12px;
       }
 
       .container {
-        padding: 20px;
+        padding: 24px 18px;
+        border-radius: 10px;
       }
 
-      h1 {
-        font-size: 24px;
-      }
-
-      textarea {
-        font-size: 14px;
+      button#generateBtn {
+        font-size: 17px;
+        padding: 16px;
       }
     }
   </style>
@@ -201,49 +307,66 @@
 
 <div class="container">
 
-  <h1>🎙️ Dengbej AI Story Generator</h1>
+  <div class="header">
+    <h1>🎙️ Dengbej AI Story Generator</h1>
+    <p>
+      Paste text or provide an article URL to transform it into a bilingual story
+      inspired by the <strong>dengbêj</strong> storytelling tradition.
+      Get both English and Kurdish versions with English audio narration.
+    </p>
+  </div>
 
-  <p>
-    Paste text or provide an article URL to transform it into a bilingual story 
-    inspired by the <strong>dengbêj</strong> storytelling tradition. 
-    Get both English and Kurdish versions with English audio narration.
-  </p>
+  <hr class="divider">
 
-  <label for="urlInput">Article URL (optional):</label>
-  <input 
-    type="url" 
-    id="urlInput" 
-    placeholder="https://example.com/article"
-  />
+  <div class="field">
+    <label for="urlInput">Article URL <span style="font-weight:400;color:#888">(optional)</span></label>
+    <input
+      type="url"
+      id="urlInput"
+      placeholder="https://example.com/article"
+    />
+  </div>
 
-  <label for="textInput">Or paste text directly:</label>
-  <textarea
-    id="textInput"
-    rows="10"
-    placeholder="Paste your article, story, or text here..."
-  ></textarea>
+  <div class="field">
+    <label for="textInput">Or paste text directly</label>
+    <textarea
+      id="textInput"
+      rows="8"
+      placeholder="Paste your article, story, or text here..."
+    ></textarea>
+  </div>
 
   <button id="generateBtn" onclick="generateStory()">
-    Generate Dengbej Story
+    Generate Story
   </button>
 
   <div id="loading" class="loading">
-    <strong>⏳ Generating your bilingual story...</strong>
-    <p>Creating English summary, translating to Kurdish, and generating English audio narration. This may take 15–20 seconds.</p>
+    <span class="loading-spinner">⏳</span>
+    <div class="loading-text">
+      <strong>Creating your story...</strong>
+      <p>Summarising, translating to Kurdish, and generating audio. This may take 15–20 seconds.</p>
+    </div>
   </div>
 
   <div id="error" class="error"></div>
 
-  <div id="summary"></div>
+  <div class="output-section">
 
-  <div id="kurdishText">
-    <div class="label">📖 Kurdish Translation (Kurmanji):</div>
-    <div id="kurdishContent"></div>
-  </div>
+    <div id="summary">
+      <div class="section-label">📝 English Story</div>
+      <div id="summaryContent"></div>
+    </div>
 
-  <div id="audioContainer" class="audio-container">
-    <div class="audio-label">🔊 Listen to the English narration:</div>
-    <audio id="audioPlayer" controls preload="metadata"></audio>
+    <div id="kurdishText">
+      <div class="section-label">📖 Kurdish Translation (Kurmanji)</div>
+      <div id="kurdishContent"></div>
+    </div>
+
+    <div id="audioContainer" class="audio-container">
+      <div class="section-label">🔊 English Narration</div>
+      <audio id="audioPlayer" controls preload="metadata"></audio>
+    </div>
+
   </div>
 
 </div>
@@ -251,22 +374,22 @@
 <script>
 
 const lambdaURL =
-"https://cjopy77iu4rrnlyzzgbk6uldd40hgqdf.lambda-url.us-east-1.on.aws/";
+  "https://cjopy77iu4rrnlyzzgbk6uldd40hgqdf.lambda-url.us-east-1.on.aws/";
 
 async function generateStory() {
 
-  const text = document.getElementById("textInput").value.trim();
-  const url = document.getElementById("urlInput").value.trim();
-  const summaryElement = document.getElementById("summary");
-  const kurdishTextElement = document.getElementById("kurdishText");
-  const kurdishContentElement = document.getElementById("kurdishContent");
-  const player = document.getElementById("audioPlayer");
-  const audioContainer = document.getElementById("audioContainer");
-  const loadingElement = document.getElementById("loading");
-  const errorElement = document.getElementById("error");
-  const generateBtn = document.getElementById("generateBtn");
+  const text          = document.getElementById("textInput").value.trim();
+  const url           = document.getElementById("urlInput").value.trim();
+  const summaryEl     = document.getElementById("summary");
+  const summaryContent= document.getElementById("summaryContent");
+  const kurdishTextEl = document.getElementById("kurdishText");
+  const kurdishContent= document.getElementById("kurdishContent");
+  const player        = document.getElementById("audioPlayer");
+  const audioContainer= document.getElementById("audioContainer");
+  const loadingEl     = document.getElementById("loading");
+  const generateBtn   = document.getElementById("generateBtn");
 
-  // Validate input
+  // Validate
   if (!text && !url) {
     showError("Please provide either a URL or paste some text.");
     return;
@@ -279,12 +402,11 @@ async function generateStory() {
 
   hideError();
 
-  summaryElement.classList.remove("active");
-  kurdishTextElement.style.display = "none";
+  summaryEl.classList.remove("active");
+  kurdishTextEl.style.display = "none";
   audioContainer.classList.remove("active");
 
-  loadingElement.classList.add("active");
-
+  loadingEl.classList.add("active");
   generateBtn.disabled = true;
   generateBtn.textContent = "Generating...";
 
@@ -293,7 +415,6 @@ async function generateStory() {
 
   try {
 
-    // Prepare request body
     const requestBody = {};
     if (url) {
       requestBody.url = url;
@@ -303,9 +424,7 @@ async function generateStory() {
 
     const response = await fetch(lambdaURL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody)
     });
 
@@ -316,43 +435,28 @@ async function generateStory() {
     const data = await response.json();
     console.log("Lambda response:", data);
 
-    let result;
-
-    if (data.body) {
-      result = JSON.parse(data.body);
-    } else {
-      result = data;
-    }
+    const result = data.body ? JSON.parse(data.body) : data;
 
     if (!result.summary || !result.audio_url) {
       throw new Error("Invalid response from server");
     }
 
-    // Display English summary
-    summaryElement.innerHTML = `<strong>📝 English Summary:</strong><br><br>${result.summary}`;
-    summaryElement.classList.add("active");
+    // English summary
+    summaryContent.textContent = result.summary;
+    summaryEl.classList.add("active");
 
-    // Display Kurdish translation
+    // Kurdish translation
     if (result.kurdish_text) {
-      kurdishContentElement.textContent = result.kurdish_text;
-      kurdishTextElement.style.display = "block";
+      kurdishContent.textContent = result.kurdish_text;
+      kurdishTextEl.style.display = "block";
     }
 
+    // Audio
     player.src = result.audio_url;
-
     audioContainer.classList.add("active");
 
-    player.addEventListener(
-      "loadedmetadata",
-      () => console.log("Audio loaded"),
-      { once: true }
-    );
-
-    player.addEventListener(
-      "error",
-      () => showError("Audio failed to load. Try again in a few seconds."),
-      { once: true }
-    );
+    player.addEventListener("loadedmetadata", () => console.log("Audio loaded"), { once: true });
+    player.addEventListener("error", () => showError("Audio failed to load. Try again in a few seconds."), { once: true });
 
     player.load();
 
@@ -365,63 +469,45 @@ async function generateStory() {
   } catch (error) {
 
     console.error(error);
-
-    showError(
-      `Error generating story: ${error.message}. Please check your connection and try again.`
-    );
+    showError(`Error generating story: ${error.message}. Please check your connection and try again.`);
 
   } finally {
 
-    loadingElement.classList.remove("active");
-
+    loadingEl.classList.remove("active");
     generateBtn.disabled = false;
-
-    generateBtn.textContent = "Generate Dengbej Story";
+    generateBtn.textContent = "Generate Story";
 
   }
 
 }
 
-function showError(message, type="error") {
-
-  const errorElement = document.getElementById("error");
-
-  errorElement.textContent = message;
-
-  errorElement.classList.add("active");
-
+function showError(message, type = "error") {
+  const el = document.getElementById("error");
+  el.textContent = message;
+  el.classList.add("active");
   if (type === "info") {
-    errorElement.style.background = "#e3f2fd";
-    errorElement.style.borderLeftColor = "#2196f3";
-    errorElement.style.color = "#1565c0";
+    el.style.background = "#eef4fd";
+    el.style.borderLeftColor = "#2a7ae2";
+    el.style.color = "#1a4a8a";
   } else {
-    errorElement.style.background = "#ffebee";
-    errorElement.style.borderLeftColor = "#f44336";
-    errorElement.style.color = "#c62828";
+    el.style.background = "#fff5f5";
+    el.style.borderLeftColor = "#e53935";
+    el.style.color = "#b71c1c";
   }
-
 }
 
 function hideError() {
-
-  const errorElement = document.getElementById("error");
-
-  errorElement.classList.remove("active");
-
+  const el = document.getElementById("error");
+  el.classList.remove("active");
 }
 
-document
-.getElementById("textInput")
-.addEventListener("keydown", function(e) {
-
+document.getElementById("textInput").addEventListener("keydown", function (e) {
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
     generateStory();
   }
-
 });
 
 </script>
 
 </body>
-
 </html>
