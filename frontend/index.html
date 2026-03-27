@@ -284,6 +284,102 @@
       outline: none;
     }
 
+    /* ── Options panel ── */
+    .options-panel {
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .options-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .options-group-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 2px;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: #2a7ae2;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .checkbox-row input[type="checkbox"]:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .checkbox-row span {
+      font-size: 15px;
+      color: #333;
+    }
+
+    .checkbox-row .badge {
+      font-size: 11px;
+      font-weight: 600;
+      color: #888;
+      background: #f0f0f0;
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-left: 2px;
+    }
+
+    /* Dengbej mode toggle row */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      user-select: none;
+      padding: 14px 16px;
+      background: #fafafa;
+      border: 1.5px solid #e8e8e8;
+      border-radius: 8px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .toggle-row:hover {
+      border-color: #2a7ae2;
+      background: #f5f9ff;
+    }
+
+    .toggle-row input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: #2a7ae2;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .toggle-row .toggle-label {
+      font-size: 15px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+
+    .toggle-row .toggle-desc {
+      font-size: 13px;
+      color: #777;
+      margin-top: 2px;
+    }
+
     /* ── Mobile ── */
     @media (max-width: 600px) {
       body {
@@ -336,7 +432,41 @@
     ></textarea>
   </div>
 
-  <button id="generateBtn" onclick="generateStory()">
+  <!-- ── Options panel ── -->
+  <div class="options-panel">
+
+    <!-- Language selection -->
+    <div class="options-group">
+      <div class="options-group-label">Output Languages</div>
+
+      <label class="checkbox-row">
+        <input type="checkbox" id="langEnglish" checked disabled />
+        <span>English <span class="badge">always on</span></span>
+      </label>
+
+      <label class="checkbox-row">
+        <input type="checkbox" id="langKurdish" />
+        <span>Kurdish (Kurmanji)</span>
+      </label>
+
+      <label class="checkbox-row">
+        <input type="checkbox" id="langTurkish" />
+        <span>Turkish</span>
+      </label>
+    </div>
+
+    <!-- Dengbej mode -->
+    <label class="toggle-row">
+      <input type="checkbox" id="dengbejMode" />
+      <div>
+        <div class="toggle-label">🎙️ Enable Dengbej Storytelling Mode</div>
+        <div class="toggle-desc">Narrate in the style of a traditional Kurdish dengbêj oral storyteller</div>
+      </div>
+    </label>
+
+  </div>
+
+  <button id="generateBtn" onclick="generateStory()"></button>
     Generate Story
   </button>
 
