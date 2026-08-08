@@ -41,3 +41,23 @@ variable "news_ingester_function_name" {
   type        = string
   default     = "dengbej-ai-news-ingester"
 }
+
+# ─── Today's 5 Curation Pipeline ─────────────────────────────────────────────
+
+variable "briefings_table_name" {
+  description = "DynamoDB table name for daily briefings"
+  type        = string
+  default     = "dengbej-briefings"
+}
+
+variable "curator_function_name" {
+  description = "Lambda function name for Today's 5 curator"
+  type        = string
+  default     = "dengbej-ai-todays-five-curator"
+}
+
+variable "bedrock_model_id" {
+  description = "Bedrock model inference profile ID"
+  type        = string
+  default     = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+}

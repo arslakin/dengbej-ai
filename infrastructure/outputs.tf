@@ -49,3 +49,25 @@ output "news_ingester_function_arn" {
   description = "News ingester Lambda function ARN"
   value       = aws_lambda_function.news_ingester.arn
 }
+
+# ─── Today's 5 Curation Outputs ──────────────────────────────────────────────
+
+output "briefings_table_name" {
+  description = "DynamoDB briefings table name"
+  value       = aws_dynamodb_table.briefings.name
+}
+
+output "briefings_table_arn" {
+  description = "DynamoDB briefings table ARN"
+  value       = aws_dynamodb_table.briefings.arn
+}
+
+output "curator_function_name" {
+  description = "Curator Lambda function name"
+  value       = aws_lambda_function.curator.function_name
+}
+
+output "curator_function_arn" {
+  description = "Curator Lambda function ARN"
+  value       = aws_lambda_function.curator.arn
+}
