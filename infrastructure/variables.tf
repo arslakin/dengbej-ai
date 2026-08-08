@@ -10,20 +10,34 @@ variable "project_name" {
   default     = "dengbej-ai"
 }
 
-variable "environment" {
-  description = "Environment (dev, staging, prod)"
-  type        = string
-  default     = "prod"
-}
-
 variable "s3_bucket_name" {
-  description = "S3 bucket name for audio storage (must be globally unique)"
+  description = "S3 bucket name for audio storage"
   type        = string
-  default     = "dengbej-ai-audio-storage"
+  default     = "dengbej-audio"
 }
 
 variable "lambda_function_name" {
   description = "Lambda function name"
   type        = string
-  default     = "dengbej-ai-story-generator"
+  default     = "dengbej-summary"
+}
+
+variable "lambda_role_name" {
+  description = "IAM role name for the Lambda function"
+  type        = string
+  default     = "dengbej-summary-role-c6jwhqf1"
+}
+
+# ─── News Ingestion Pipeline ─────────────────────────────────────────────────
+
+variable "articles_table_name" {
+  description = "DynamoDB table name for news articles"
+  type        = string
+  default     = "dengbej-articles"
+}
+
+variable "news_ingester_function_name" {
+  description = "Lambda function name for news ingester"
+  type        = string
+  default     = "dengbej-ai-news-ingester"
 }

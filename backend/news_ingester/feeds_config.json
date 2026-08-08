@@ -1,0 +1,25 @@
+{
+  "feeds": [
+    {
+      "id": "bbc-world",
+      "source_name": "BBC News",
+      "feed_url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+      "enabled": true,
+      "notes": "BBC RSS is free for personal/non-commercial use. Business use requires permission. Attribution: 'BBC News'. Must link to original article."
+    },
+    {
+      "id": "dw-english",
+      "source_name": "Deutsche Welle",
+      "feed_url": "https://rss.dw.com/rdf/rss-en-all",
+      "enabled": true,
+      "notes": "DW RSS is publicly available. Republishing full articles is not permitted without written permission. Attribution: 'Deutsche Welle'. Must link to original."
+    },
+    {
+      "id": "aljazeera-english",
+      "source_name": "Al Jazeera English",
+      "feed_url": "https://www.aljazeera.com/xml/rss/all.xml",
+      "enabled": true,
+      "notes": "All Al Jazeera content is copyrighted. No explicit RSS reuse licence found. Use RSS metadata for discovery only. Attribution: 'Al Jazeera'. Must link to original."
+    }
+  ]
+}

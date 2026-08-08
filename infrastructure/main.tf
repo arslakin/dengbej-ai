@@ -1,6 +1,6 @@
 terraform {
   required_version = ">= 1.0"
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -17,15 +17,14 @@ provider "aws" {
   region = var.aws_region
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
 # S3 Bucket for audio storage
+# ─────────────────────────────────────────────────────────────────────────────
+
 resource "aws_s3_bucket" "audio_storage" {
   bucket = var.s3_bucket_name
 
-  tags = {
-    Name        = "Dengbej AI Audio Storage"
-    Project     = "dengbej-ai"
-    Environment = var.environment
-  }
+  tags = {}
 }
 
 # S3 Bucket Public Access Configuration
@@ -46,7 +45,7 @@ resource "aws_s3_bucket_policy" "audio_storage" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "PublicReadGetObject"
+        Sid       = "PublicReadAudioFiles"
         Effect    = "Allow"
         Principal = "*"
         Action    = "s3:GetObject"
@@ -58,22 +57,16 @@ resource "aws_s3_bucket_policy" "audio_storage" {
   depends_on = [aws_s3_bucket_public_access_block.audio_storage]
 }
 
-# S3 Bucket CORS Configuration
-resource "aws_s3_bucket_cors_configuration" "audio_storage" {
-  bucket = aws_s3_bucket.audio_storage.id
+# NOTE: No S3 CORS configuration exists on the live bucket.
+# Do not add one during reconciliation.
 
-  cors_rule {
-    allowed_headers = ["*"]
-    allowed_methods = ["GET", "HEAD"]
-    allowed_origins = ["*"]
-    expose_headers  = ["ETag"]
-    max_age_seconds = 3000
-  }
-}
-
+# ─────────────────────────────────────────────────────────────────────────────
 # IAM Role for Lambda
+# ─────────────────────────────────────────────────────────────────────────────
+
 resource "aws_iam_role" "lambda_role" {
-  name = "${var.project_name}-lambda-role"
+  name = var.lambda_role_name
+  path = "/service-role/"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -87,16 +80,11 @@ resource "aws_iam_role" "lambda_role" {
       }
     ]
   })
-
-  tags = {
-    Name    = "Dengbej AI Lambda Role"
-    Project = "dengbej-ai"
-  }
 }
 
-# IAM Policy for Lambda
-resource "aws_iam_role_policy" "lambda_policy" {
-  name = "${var.project_name}-lambda-policy"
+# Inline policy: S3 upload only (matches existing DengbejS3Upload)
+resource "aws_iam_role_policy" "lambda_s3_policy" {
+  name = "DengbejS3Upload"
   role = aws_iam_role.lambda_role.id
 
   policy = jsonencode({
@@ -105,74 +93,83 @@ resource "aws_iam_role_policy" "lambda_policy" {
       {
         Effect = "Allow"
         Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
+          "s3:PutObject"
         ]
-        Resource = "arn:aws:logs:*:*:*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "bedrock:InvokeModel"
+        Resource = [
+          aws_s3_bucket.audio_storage.arn,
+          "${aws_s3_bucket.audio_storage.arn}/*"
         ]
-        Resource = "arn:aws:bedrock:${var.aws_region}::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "polly:SynthesizeSpeech"
-        ]
-        Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:PutObject",
-          "s3:PutObjectAcl"
-        ]
-        Resource = "${aws_s3_bucket.audio_storage.arn}/*"
       }
     ]
   })
 }
+
+# Managed policy attachments (matching current AWS state)
+resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::387276719593:policy/service-role/AWSLambdaBasicExecutionRole-b438d8f4-deab-4808-bec7-e57d2f7cbb29"
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_polly_full" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonPollyFullAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_bedrock_full" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonBedrockFullAccess"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Lambda Function
+# ─────────────────────────────────────────────────────────────────────────────
 
 # Package Lambda function
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = "${path.module}/../backend"
   output_path = "${path.module}/lambda_function.zip"
-  
+
   excludes = [
     "README.md",
     "__pycache__",
     "*.pyc",
     ".pytest_cache",
-    "tests"
+    "tests",
+    "news_ingester"
   ]
 }
 
-# Lambda Function
+# TODO: The dengbej-summary Lambda was originally deployed manually via the
+# AWS Console. Terraform now manages its infrastructure configuration (role,
+# timeout, memory, runtime, etc.) but application-code deployment remains
+# intentionally protected by a lifecycle rule below.
+#
+# The ignore_changes on filename and source_code_hash prevents Terraform from
+# overwriting the currently deployed Lambda package with the local zip. This is
+# a temporary measure. Remove this lifecycle block when we deliberately migrate
+# Lambda code deployment to Terraform or CI/CD, at which point the local code
+# should match what we intend to deploy.
 resource "aws_lambda_function" "dengbej_ai" {
   filename         = data.archive_file.lambda_zip.output_path
   function_name    = var.lambda_function_name
-  role            = aws_iam_role.lambda_role.arn
-  handler         = "lambda_function.lambda_handler"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "lambda_function.lambda_handler"
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
-  runtime         = "python3.11"
-  timeout         = 60
-  memory_size     = 512
+  runtime          = "python3.11"
+  timeout          = 30
+  memory_size      = 512
+  architectures    = ["x86_64"]
 
-  environment {
-    variables = {
-      S3_BUCKET_NAME = aws_s3_bucket.audio_storage.id
-      AWS_REGION     = var.aws_region
-    }
-  }
+  # NOTE: The existing Lambda has NO environment variables.
+  # Do not add any during reconciliation.
 
-  tags = {
-    Name    = "Dengbej AI Lambda"
-    Project = "dengbej-ai"
+  tags = {}
+
+  lifecycle {
+    # Temporary: Protect deployed application code from being overwritten.
+    # Terraform still manages all other Lambda configuration attributes.
+    ignore_changes = [filename, source_code_hash]
   }
 }
 
@@ -184,20 +181,20 @@ resource "aws_lambda_function_url" "dengbej_ai" {
   cors {
     allow_credentials = false
     allow_origins     = ["*"]
-    allow_methods     = ["POST", "OPTIONS"]
-    allow_headers     = ["content-type"]
-    expose_headers    = ["keep-alive", "date"]
-    max_age          = 86400
+    allow_methods     = ["POST"]
+    allow_headers     = ["*"]
+    expose_headers    = []
+    max_age           = 300
   }
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
 # CloudWatch Log Group
+# ─────────────────────────────────────────────────────────────────────────────
+
 resource "aws_cloudwatch_log_group" "lambda_logs" {
   name              = "/aws/lambda/${var.lambda_function_name}"
-  retention_in_days = 7
+  retention_in_days = 0 # Never expires (matches current AWS state)
 
-  tags = {
-    Name    = "Dengbej AI Lambda Logs"
-    Project = "dengbej-ai"
-  }
+  tags = {}
 }

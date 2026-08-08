@@ -27,3 +27,25 @@ output "cloudwatch_log_group" {
   description = "CloudWatch log group name"
   value       = aws_cloudwatch_log_group.lambda_logs.name
 }
+
+# ─── News Ingestion Pipeline Outputs ─────────────────────────────────────────
+
+output "articles_table_name" {
+  description = "DynamoDB articles table name"
+  value       = aws_dynamodb_table.articles.name
+}
+
+output "articles_table_arn" {
+  description = "DynamoDB articles table ARN"
+  value       = aws_dynamodb_table.articles.arn
+}
+
+output "news_ingester_function_name" {
+  description = "News ingester Lambda function name"
+  value       = aws_lambda_function.news_ingester.function_name
+}
+
+output "news_ingester_function_arn" {
+  description = "News ingester Lambda function ARN"
+  value       = aws_lambda_function.news_ingester.arn
+}
