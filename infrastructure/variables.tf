@@ -61,3 +61,11 @@ variable "bedrock_model_id" {
   type        = string
   default     = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 }
+
+# ─── Today's 5 Processor Pipeline ────────────────────────────────────────────
+
+variable "processor_function_name" {
+  description = "Lambda function name for Today's 5 processor"
+  type        = string
+  default     = "dengbej-ai-todays-five-processor"
+}

@@ -71,3 +71,15 @@ output "curator_function_arn" {
   description = "Curator Lambda function ARN"
   value       = aws_lambda_function.curator.arn
 }
+
+# ─── Today's 5 Processor Outputs ─────────────────────────────────────────────
+
+output "processor_function_name" {
+  description = "Processor Lambda function name"
+  value       = aws_lambda_function.processor.function_name
+}
+
+output "processor_function_arn" {
+  description = "Processor Lambda function ARN"
+  value       = aws_lambda_function.processor.arn
+}

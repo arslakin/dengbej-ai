@@ -72,6 +72,8 @@ infrastructure/lambda_function.zip
 infrastructure/news_ingester.zip
 infrastructure/news_ingester_layer.zip
 infrastructure/todays_five_curator.zip
+infrastructure/todays_five_processor.zip
+infrastructure/processor_layer.zip
 
 # -----------------------------
 # Terraform
