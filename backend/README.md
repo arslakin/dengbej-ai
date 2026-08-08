@@ -79,7 +79,7 @@ Required IAM policy for the Lambda execution role:
       "Action": [
         "bedrock:InvokeModel"
       ],
-      "Resource": "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"
+      "Resource": "arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0"
     },
     {
       "Effect": "Allow",
@@ -159,10 +159,10 @@ Modify the `VoiceId` in `synthesize_speech()` function. Available neural voices:
 
 ### Model Selection
 
-Change `MODEL_ID` to use different Bedrock models:
-- `anthropic.claude-3-haiku-20240307-v1:0` (fast, cost-effective)
-- `anthropic.claude-3-sonnet-20240229-v1:0` (balanced)
-- `anthropic.claude-3-opus-20240229-v1:0` (most capable)
+Change `MODEL_ID` to use different Bedrock models (via cross-region inference profiles):
+- `us.anthropic.claude-haiku-4-5-20251001-v1:0` (fast, cost-effective — current)
+- `us.anthropic.claude-sonnet-4-5-20250929-v1:0` (balanced)
+- `us.anthropic.claude-opus-4-5-20251101-v1:0` (most capable)
 
 ## Monitoring
 

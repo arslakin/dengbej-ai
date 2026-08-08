@@ -14,7 +14,7 @@ s3_client = boto3.client("s3")
 S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "dengbej-audio")
 
 # IMPORTANT: Must use inference profile
-MODEL_ID = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
+MODEL_ID = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 MAX_ARTICLE_LENGTH = 8000
 
