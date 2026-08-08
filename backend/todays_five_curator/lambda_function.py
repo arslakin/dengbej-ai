@@ -132,6 +132,10 @@ def lambda_handler(event, context):
     telemetry.selected_count = len(selected)
     print(f"Stage 4 — Selected: {len(selected)}, Diversity actions: {len(diversity_log)}")
 
+    # Stage 4b: Final duplicate guard
+    selected, dedup_log = deduplicate_selection(selected, scored_clusters)
+    print(f"Stage 4b — After dedup: {len(selected)} stories, dedup actions: {len(dedup_log)}")
+
     # Stage 5: Store briefing
     briefing = store_briefing(selected, now)
 
@@ -147,6 +151,7 @@ def lambda_handler(event, context):
             "clusters_total": len(clusters),
             "candidates_total": len(candidates),
             "diversity_log": diversity_log,
+            "dedup_log": dedup_log,
             "telemetry": telemetry.to_dict(),
         })
     }
@@ -189,117 +194,188 @@ STOPWORDS = {
     "said", "after", "over", "new", "more", "about", "into", "up", "out",
 }
 
+ENTITY_INDICATORS = {
+    "saudi", "arabia", "turkey", "turkiye", "pakistan", "iran", "iraq", "syria",
+    "israel", "palestine", "ukraine", "russia", "china", "india", "lebanon",
+    "yemen", "egypt", "jordan", "qatar", "kuwait", "oman", "bahrain",
+    "erdogan", "putin", "zelenskyy", "netanyahu", "trump", "biden",
+    "nato", "who", "hamas", "hezbollah", "houthi",
+    "pact", "treaty", "agreement", "ceasefire", "summit", "election",
+}
+
 
 def normalize_headline(headline):
-    """Lowercase, remove punctuation, remove stopwords."""
-    text = re.sub(r"[^a-z0-9\s]", "", headline.lower())
+    """Lowercase, split hyphenated words, remove punctuation, remove stopwords."""
+    # Split hyphenated/compound words BEFORE removing punctuation
+    text = headline.lower()
+    text = re.sub(r"[-–—/]", " ", text)  # Split on hyphens, dashes, slashes
+    text = re.sub(r"[^a-z0-9\s]", "", text)
     tokens = [w for w in text.split() if w not in STOPWORDS and len(w) > 2]
     return tokens
 
 
 def token_similarity(tokens_a, tokens_b):
-    """Jaccard similarity on token sets."""
+    """Jaccard similarity on token sets with entity-aware boosting."""
     set_a, set_b = set(tokens_a), set(tokens_b)
     if not set_a or not set_b:
         return 0.0
     intersection = set_a & set_b
     union = set_a | set_b
-    return len(intersection) / len(union)
+    jaccard = len(intersection) / len(union)
+
+    # Boost: if intersection contains proper-noun-like tokens (countries, names)
+    # that typically identify specific events, increase similarity
+    entity_tokens = intersection & ENTITY_INDICATORS
+    if len(entity_tokens) >= 2:
+        jaccard = min(1.0, jaccard * 1.3)
+
+    return jaccard
 
 
 def cluster_stories(articles):
-    """Group articles about the same event using token similarity + Bedrock."""
-    # Tokenize all headlines
+    """Group articles about the same event using improved similarity + Bedrock."""
     tokenized = [(art, normalize_headline(art.get("headline", ""))) for art in articles]
 
-    clusters = []  # List of lists
+    clusters = []
     assigned = set()
 
-    # Sort by source to process systematically
+    # Pass 1: Deterministic merge at higher confidence (sim >= 0.40)
     for i, (art_i, tokens_i) in enumerate(tokenized):
         if i in assigned:
             continue
-
         cluster = [art_i]
         assigned.add(i)
-
         for j, (art_j, tokens_j) in enumerate(tokenized):
             if j in assigned or j <= i:
                 continue
-
             sim = token_similarity(tokens_i, tokens_j)
-
-            if sim >= 0.35:
-                # High similarity — auto-cluster
+            if sim >= 0.40:
                 cluster.append(art_j)
                 assigned.add(j)
-
         clusters.append(cluster)
 
-    # For clusters with single articles, check if Bedrock can find matches
-    # among other single-article clusters (ambiguous cases)
+    # Pass 2: Bedrock verification for ambiguous candidate pairs (sim 0.20 - 0.39)
     single_clusters = [c for c in clusters if len(c) == 1]
     multi_clusters = [c for c in clusters if len(c) > 1]
 
-    if len(single_clusters) > 1:
-        merged_singles = bedrock_merge_ambiguous(single_clusters)
-        clusters = multi_clusters + merged_singles
+    if len(single_clusters) > 3:
+        # Find candidate pairs with moderate similarity
+        candidate_pairs = find_ambiguous_pairs(single_clusters, tokenized_lookup={
+            id(art): tokens for art, tokens in tokenized
+        })
+        if candidate_pairs:
+            merged_singles = bedrock_verify_pairs(single_clusters, candidate_pairs)
+            clusters = multi_clusters + merged_singles
+        else:
+            clusters = multi_clusters + single_clusters
+    else:
+        clusters = multi_clusters + single_clusters
 
     return [build_cluster_info(c) for c in clusters]
 
 
-def bedrock_merge_ambiguous(single_clusters):
-    """Use Bedrock to identify same-event coverage among single-article clusters."""
-    if len(single_clusters) <= 3:
-        return single_clusters  # Too few to bother
+def find_ambiguous_pairs(single_clusters, tokenized_lookup=None):
+    """Find pairs of single-article clusters with moderate similarity (0.20-0.39)."""
+    pairs = []
+    for i in range(len(single_clusters)):
+        art_i = single_clusters[i][0]
+        tokens_i = normalize_headline(art_i.get("headline", ""))
+        for j in range(i + 1, len(single_clusters)):
+            art_j = single_clusters[j][0]
+            tokens_j = normalize_headline(art_j.get("headline", ""))
+            sim = token_similarity(tokens_i, tokens_j)
+            if 0.20 <= sim < 0.40:
+                pairs.append((i, j, sim))
+    # Limit to top 15 most similar pairs to control Bedrock cost
+    pairs.sort(key=lambda x: x[2], reverse=True)
+    return pairs[:15]
 
-    # Take top headlines for comparison (limit to avoid huge prompts)
-    headlines = [c[0].get("headline", "") for c in single_clusters[:40]]
 
-    prompt = f"""Below are {len(headlines)} news headlines from different sources.
-Identify groups of headlines that are about the SAME news event or topic.
-Only group headlines that are clearly about the same specific event.
-Do not group headlines that are merely about the same general topic area.
+def bedrock_verify_pairs(single_clusters, candidate_pairs):
+    """Use Bedrock to verify whether candidate pairs describe the same event."""
+    if not candidate_pairs:
+        return single_clusters
 
-Headlines (numbered):
-{chr(10).join(f"{i+1}. {h}" for i, h in enumerate(headlines))}
+    # Build the verification prompt with ONLY the candidate pairs
+    pair_descriptions = []
+    for idx, (i, j, sim) in enumerate(candidate_pairs):
+        h_i = single_clusters[i][0].get("headline", "")
+        h_j = single_clusters[j][0].get("headline", "")
+        pair_descriptions.append(f"Pair {idx+1}: \"{h_i}\" vs \"{h_j}\"")
 
-Return a JSON array of groups. Each group is an array of headline numbers.
-Only include groups with 2+ headlines. Headlines not in any group are standalone.
-Example: [[1,5],[3,7,12]]
+    prompt = f"""You are a news editor determining whether headline pairs describe the SAME specific news event.
 
-JSON groups:"""
+RULES:
+- Same specific event = YES (different reports about the same incident/development)
+- Same general topic/country/region but different events = NO
+- Shared keywords or entities alone do NOT mean same event
+- Analysis/follow-up about the same specific development = YES
+- Return false when uncertain — missed merges are safer than false merges
+
+For each pair, determine if they describe the SAME specific news event.
+
+{chr(10).join(pair_descriptions)}
+
+Return a JSON array with one object per pair:
+[{{"pair": 1, "same_event": true, "confidence": 0.95}}]
+
+Only mark same_event=true when confidence >= 0.80.
+
+JSON:"""
 
     try:
         result = invoke_bedrock(prompt, max_tokens=500)
-        # Parse JSON from response
         json_match = re.search(r'\[.*\]', result, re.DOTALL)
         if json_match:
-            groups = json.loads(json_match.group())
-            # Merge indicated clusters
+            verdicts = json.loads(json_match.group())
+
+            # Process merges
+            merge_map = {}  # index -> merge_target_index
+            for verdict in verdicts:
+                if not isinstance(verdict, dict):
+                    continue
+                pair_num = verdict.get("pair", 0) - 1
+                same = verdict.get("same_event", False)
+                confidence = verdict.get("confidence", 0)
+
+                if same and confidence >= 0.80 and 0 <= pair_num < len(candidate_pairs):
+                    i, j, _ = candidate_pairs[pair_num]
+                    # Merge j into i's cluster
+                    if j not in merge_map and i not in merge_map:
+                        merge_map[j] = i
+                    elif j not in merge_map:
+                        merge_map[j] = merge_map.get(i, i)
+
+            # Build merged clusters
             merged_indices = set()
-            merged_clusters = []
+            result_clusters = []
 
-            for group in groups:
-                if isinstance(group, list) and len(group) >= 2:
-                    valid_indices = [g - 1 for g in group if isinstance(g, int) and 1 <= g <= len(single_clusters)]
-                    if len(valid_indices) >= 2:
-                        merged = []
-                        for idx in valid_indices:
-                            merged.extend(single_clusters[idx])
-                            merged_indices.add(idx)
-                        merged_clusters.append(merged)
+            for target_i, source_j_list in _group_merges(merge_map).items():
+                merged = list(single_clusters[target_i])
+                for j in source_j_list:
+                    merged.extend(single_clusters[j])
+                    merged_indices.add(j)
+                merged_indices.add(target_i)
+                result_clusters.append(merged)
 
-            # Keep unmerged singles as-is
+            # Keep unmerged singles
             for i, c in enumerate(single_clusters):
                 if i not in merged_indices:
-                    merged_clusters.append(c)
+                    result_clusters.append(c)
 
-            return merged_clusters
+            return result_clusters
     except Exception as e:
-        print(f"Bedrock merge failed (non-fatal): {e}")
+        print(f"Bedrock pair verification failed (non-fatal): {e}")
 
     return single_clusters
+
+
+def _group_merges(merge_map):
+    """Group merge targets: {target_i: [j1, j2, ...]}"""
+    groups = defaultdict(list)
+    for j, i in merge_map.items():
+        groups[i].append(j)
+    return groups
 
 
 def build_cluster_info(article_list):
@@ -511,6 +587,106 @@ def select_with_diversity(scored_clusters):
         })
 
     return selected, diversity_log
+
+
+# ─── Stage 4b: Final Duplicate Guard ─────────────────────────────────────────
+
+def deduplicate_selection(selected, scored_clusters):
+    """
+    Final safety net: verify no two selected stories are the same event.
+    If duplicates found, keep higher-ranked and promote next distinct candidate.
+    """
+    if len(selected) < 2:
+        return selected, []
+
+    dedup_log = []
+
+    # Check pairs within the selection
+    pairs_to_check = []
+    for i in range(len(selected)):
+        for j in range(i + 1, len(selected)):
+            tokens_i = normalize_headline(selected[i].get("headline", ""))
+            tokens_j = normalize_headline(selected[j].get("headline", ""))
+            sim = token_similarity(tokens_i, tokens_j)
+            if sim >= 0.20:  # Even moderate similarity warrants checking
+                pairs_to_check.append((i, j, sim))
+
+    if not pairs_to_check:
+        return selected, dedup_log
+
+    # Ask Bedrock to verify
+    pair_descriptions = []
+    for idx, (i, j, sim) in enumerate(pairs_to_check):
+        pair_descriptions.append(
+            f"Pair {idx+1}: \"{selected[i]['headline']}\" vs \"{selected[j]['headline']}\""
+        )
+
+    prompt = f"""Are these headline pairs about the SAME specific news event?
+Same event = different coverage of the same incident/development.
+Same topic/country but different events = NO.
+
+{chr(10).join(pair_descriptions)}
+
+Return JSON: [{{"pair": 1, "same_event": true, "confidence": 0.95}}]
+Only same_event=true when confidence >= 0.80.
+
+JSON:"""
+
+    try:
+        result = invoke_bedrock(prompt, max_tokens=300)
+        json_match = re.search(r'\[.*\]', result, re.DOTALL)
+        if json_match:
+            verdicts = json.loads(json_match.group())
+
+            indices_to_remove = set()
+            for verdict in verdicts:
+                if not isinstance(verdict, dict):
+                    continue
+                pair_num = verdict.get("pair", 0) - 1
+                same = verdict.get("same_event", False)
+                confidence = verdict.get("confidence", 0)
+
+                if same and confidence >= 0.80 and 0 <= pair_num < len(pairs_to_check):
+                    i, j, _ = pairs_to_check[pair_num]
+                    # Remove the lower-ranked (higher index) duplicate
+                    indices_to_remove.add(j)
+                    dedup_log.append({
+                        "removed": selected[j]["headline"],
+                        "duplicate_of": selected[i]["headline"],
+                        "confidence": confidence,
+                    })
+
+            if indices_to_remove:
+                # Remove duplicates and promote replacements
+                cleaned = [s for idx, s in enumerate(selected) if idx not in indices_to_remove]
+
+                # Promote from remaining scored clusters
+                selected_headlines = set(s["headline"] for s in cleaned)
+                for cluster in scored_clusters:
+                    if len(cleaned) >= 5:
+                        break
+                    if cluster["headline"] not in selected_headlines:
+                        # Verify this promotion is not ALSO a duplicate
+                        is_dup = False
+                        for existing in cleaned:
+                            t1 = normalize_headline(existing["headline"])
+                            t2 = normalize_headline(cluster["headline"])
+                            if token_similarity(t1, t2) >= 0.40:
+                                is_dup = True
+                                break
+                        if not is_dup:
+                            cleaned.append(cluster)
+                            selected_headlines.add(cluster["headline"])
+                            dedup_log.append({
+                                "promoted": cluster["headline"],
+                                "reason": "Replaced duplicate event",
+                            })
+
+                return cleaned, dedup_log
+    except Exception as e:
+        print(f"Dedup verification failed (non-fatal): {e}")
+
+    return selected, dedup_log
 
 
 # ─── Stage 5: Store Briefing ─────────────────────────────────────────────────

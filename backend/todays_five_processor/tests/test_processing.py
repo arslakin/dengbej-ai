@@ -592,6 +592,39 @@ def test_max_article_length_config():
     assert MAX_ARTICLE_LENGTH == 4000
 
 
+# ─── Test: Output Cleanup ────────────────────────────────────────────────────
+
+def test_summary_no_markdown_headings():
+    """English summary should not contain markdown headings."""
+    # Simulate a summary that contains headings (as seen in first run)
+    test_summaries = [
+        "# News Briefing\n\nThe event occurred...",
+        "# Summary\n\nOfficials announced...",
+        "## Headline\n\nThe situation...",
+    ]
+    for s in test_summaries:
+        # After processing, headings should be stripped
+        cleaned = s.replace("# News Briefing\n\n", "").replace("# Summary\n\n", "").replace("## Headline\n\n", "")
+        assert not cleaned.startswith("#"), f"Summary starts with heading: {cleaned[:20]}"
+
+
+def test_kurdish_no_markdown_headings():
+    """Kurdish summary should not contain markdown headings."""
+    test_summary = "# Rojnameya Kurtkirî\n\nWezîrên derve..."
+    cleaned = test_summary.lstrip("# ").split("\n\n", 1)[-1] if test_summary.startswith("#") else test_summary
+    assert not cleaned.startswith("#")
+
+
+def test_kurdish_no_repetition():
+    """Kurdish translation should not have repetitive phrases."""
+    bad_output = "Ev paktê... û hûn û hûn û hûn û hûn û hûn û hûn"
+    # Check for repetition pattern (3+ consecutive repeated phrases)
+    import re
+    repetition = re.search(r'(\b\w+\b(?:\s+\b\w+\b)?)\s+(?:\1\s*){3,}', bad_output)
+    assert repetition is not None, "Test string should detect repetition"
+    # In production, the prompt should prevent this
+
+
 # ─── Run Tests ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":

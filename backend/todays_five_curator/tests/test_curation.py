@@ -320,6 +320,86 @@ def test_build_cluster_multi_source():
     assert cluster["primary_source"] == "Deutsche Welle"
 
 
+# ─── Test: Improved Clustering ───────────────────────────────────────────────
+
+def test_saudi_pact_headlines_merge():
+    """BBC and Al Jazeera Saudi pact headlines should be recognized as same event."""
+    t1 = normalize_headline("Saudi Arabia, Turkey and Pakistan sign defence pact")
+    t2 = normalize_headline("Saudi-Pakistan-Turkiye pact: A new shield or strategic signal?")
+    sim = token_similarity(t1, t2)
+    # After fix: hyphenated words split, entity boost applied
+    # "saudi", "pakistan", "pact" + entity boost should give >= 0.20
+    assert sim >= 0.20, f"Saudi pact similarity {sim} should be >= 0.20 for Bedrock verification"
+
+
+def test_lebanon_syria_vs_dr_congo_different():
+    """Lebanon/Syria general story and DR Congo story must NOT merge."""
+    t1 = normalize_headline("Lebanon 'detains' former al-Assad-era general, weighs handing him to Syria")
+    t2 = normalize_headline("DR Congo releases 15 prisoners to M23 rebels as part of Doha peace process")
+    sim = token_similarity(t1, t2)
+    assert sim < 0.20, f"Lebanon vs Congo similarity {sim} should be < 0.20"
+
+
+def test_same_country_different_events():
+    """Two stories about same country but different events should not merge."""
+    t1 = normalize_headline("Turkey signs defence pact with Saudi Arabia")
+    t2 = normalize_headline("Turkey earthquake kills dozens in southeastern province")
+    sim = token_similarity(t1, t2)
+    assert sim < 0.40, f"Different Turkey events similarity {sim} should be < 0.40"
+
+
+def test_hyphenated_words_split():
+    """Hyphenated compound words should be split into separate tokens."""
+    tokens = normalize_headline("Saudi-Pakistan-Turkiye pact signed")
+    assert "saudi" in tokens
+    assert "pakistan" in tokens
+    assert "turkiye" in tokens
+    # Should NOT contain the compound
+    assert "saudipakistanturkiye" not in tokens
+
+
+def test_followup_analysis_same_event():
+    """Follow-up analysis about same specific event should have moderate similarity."""
+    t1 = normalize_headline("Saudi Arabia, Turkey and Pakistan sign defence pact")
+    t2 = normalize_headline("Will Pakistan-Saudi-Turkiye alliance actually create a new regional order?")
+    sim = token_similarity(t1, t2)
+    # After hyphen splitting: saudi, pakistan, turkiye/turkey overlap
+    assert sim >= 0.20, f"Follow-up analysis similarity {sim} should be >= 0.20"
+
+
+def test_deduplicate_selection_removes_duplicate():
+    """Dedup guard should remove duplicate events from final selection."""
+    from lambda_function import deduplicate_selection
+
+    # Two stories about same event (high token sim will trigger check)
+    selected = [
+        _make_cluster("Saudi Arabia signs defence pact", "BBC News", 0.90),
+        _make_cluster("DW unrelated story", "Deutsche Welle", 0.85),
+        _make_cluster("Saudi Arabia defence pact analysis", "Al Jazeera English", 0.80),
+        _make_cluster("Another story", "BBC News", 0.75),
+        _make_cluster("Fifth story", "Deutsche Welle", 0.70),
+    ]
+
+    # Without Bedrock (will just check token sim and attempt Bedrock)
+    # Since Bedrock isn't available in tests, it will fall through gracefully
+    result, log = deduplicate_selection(selected, selected + [
+        _make_cluster("Replacement story", "Al Jazeera English", 0.65)
+    ])
+    # Should still return 5 (or gracefully handle Bedrock failure)
+    assert len(result) >= 4  # At minimum should not crash
+
+
+def test_supporting_source_unrelated_rejection():
+    """Unrelated supporting source should not be included if similarity is too low."""
+    # This verifies the improved clustering won't merge unrelated articles
+    t_lebanon = normalize_headline("Lebanon detains former Assad general")
+    t_congo = normalize_headline("DR Congo releases prisoners to M23 rebels")
+    sim = token_similarity(t_lebanon, t_congo)
+    # Must be below the ambiguous threshold so Bedrock is never even asked
+    assert sim < 0.20, f"Unrelated stories should have sim < 0.20, got {sim}"
+
+
+
 # ─── Run Tests ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":

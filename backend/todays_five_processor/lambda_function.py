@@ -319,6 +319,8 @@ RULES:
 - Answer: What happened? Where? Who is involved? Why does it matter? What is the context?
 - Produce exactly 3-5 sentences
 - Write in clear, concise English suitable for a global audience
+- Do NOT include markdown headings, bullet points, or formatting
+- Return only the summary paragraph text
 
 HEADLINE: {headline}
 
@@ -356,6 +358,11 @@ RULES:
 - Use standard Kurdish Kurmanji orthography
 - Maintain the same sentence structure and tone as the English version
 - Translate proper nouns phonetically where no established Kurdish form exists
+- Do NOT include markdown headings, titles, or formatting
+- Do NOT repeat phrases or sentences
+- Keep the translation concise — similar length to the English original
+- If you find yourself repeating, stop and finalize the translation
+- Return only the translated paragraph text
 
 ENGLISH SUMMARY:
 {summary}
