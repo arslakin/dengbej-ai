@@ -230,8 +230,9 @@
       margin-bottom: 10px;
     }
 
-    /* Kurdish translation */
-    #kurdishText {
+    /* Translations */
+    #kurdishText,
+    #turkishText {
       display: none;
       padding: 20px;
       background: #fffbf5;
@@ -240,7 +241,8 @@
       margin-bottom: 16px;
     }
 
-    #kurdishText .section-label {
+    #kurdishText .section-label,
+    #turkishText .section-label {
       font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
@@ -249,7 +251,8 @@
       margin-bottom: 10px;
     }
 
-    #kurdishContent {
+    #kurdishContent,
+    #turkishContent {
       font-size: 16px;
       line-height: 1.75;
       color: #222;
@@ -466,7 +469,7 @@
 
   </div>
 
-  <button id="generateBtn" onclick="generateStory()"></button>
+  <button id="generateBtn" onclick="generateStory()">
     Generate Story
   </button>
 
@@ -492,6 +495,11 @@
       <div id="kurdishContent"></div>
     </div>
 
+    <div id="turkishText">
+      <div class="section-label">📖 Turkish Translation</div>
+      <div id="turkishContent"></div>
+    </div>
+
     <div id="audioContainer" class="audio-container">
       <div class="section-label">🔊 English Narration</div>
       <audio id="audioPlayer" controls preload="metadata"></audio>
@@ -514,10 +522,15 @@ async function generateStory() {
   const summaryContent= document.getElementById("summaryContent");
   const kurdishTextEl = document.getElementById("kurdishText");
   const kurdishContent= document.getElementById("kurdishContent");
+  const turkishTextEl = document.getElementById("turkishText");
+  const turkishContent= document.getElementById("turkishContent");
   const player        = document.getElementById("audioPlayer");
   const audioContainer= document.getElementById("audioContainer");
   const loadingEl     = document.getElementById("loading");
   const generateBtn   = document.getElementById("generateBtn");
+  const langKurdish   = document.getElementById("langKurdish");
+  const langTurkish   = document.getElementById("langTurkish");
+  const dengbejMode   = document.getElementById("dengbejMode");
 
   // Validate
   if (!text && !url) {
@@ -534,6 +547,7 @@ async function generateStory() {
 
   summaryEl.classList.remove("active");
   kurdishTextEl.style.display = "none";
+  turkishTextEl.style.display = "none";
   audioContainer.classList.remove("active");
 
   loadingEl.classList.add("active");
@@ -551,6 +565,12 @@ async function generateStory() {
     } else {
       requestBody.text = text;
     }
+    requestBody.languages = [
+      "en",
+      ...(langKurdish.checked ? ["ku"] : []),
+      ...(langTurkish.checked ? ["tr"] : [])
+    ];
+    requestBody.dengbej_mode = dengbejMode.checked;
 
     const response = await fetch(lambdaURL, {
       method: "POST",
@@ -566,19 +586,28 @@ async function generateStory() {
     console.log("Lambda response:", data);
 
     const result = data.body ? JSON.parse(data.body) : data;
+    const summaryText = result.summary_en || result.summary;
+    const kurdishText = result.summary_ku || result.kurdish_text;
+    const turkishText = result.summary_tr;
 
-    if (!result.summary || !result.audio_url) {
+    if (!summaryText || !result.audio_url) {
       throw new Error("Invalid response from server");
     }
 
     // English summary
-    summaryContent.textContent = result.summary;
+    summaryContent.textContent = summaryText;
     summaryEl.classList.add("active");
 
     // Kurdish translation
-    if (result.kurdish_text) {
-      kurdishContent.textContent = result.kurdish_text;
+    if (kurdishText) {
+      kurdishContent.textContent = kurdishText;
       kurdishTextEl.style.display = "block";
+    }
+
+    // Turkish translation
+    if (turkishText) {
+      turkishContent.textContent = turkishText;
+      turkishTextEl.style.display = "block";
     }
 
     // Audio

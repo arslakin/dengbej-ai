@@ -60,15 +60,23 @@ backend/typing_extensions.py
 backend/*.dist-info
 backend/bin/
 
+# News ingester dependencies
+backend/news_ingester/feedparser/
+backend/news_ingester/sgmllib3k/
+backend/news_ingester/*.dist-info
+backend/news_ingester/bin/
+
 # Lambda build artifacts
 backend/lambda.zip
 infrastructure/lambda_function.zip
+infrastructure/news_ingester.zip
+infrastructure/news_ingester_layer.zip
 
 # -----------------------------
 # Terraform
 # -----------------------------
 *.tfstate
-.tfstate.
+*.tfstate.*
 .terraform/
 .terraform.lock.hcl
 terraform.tfvars

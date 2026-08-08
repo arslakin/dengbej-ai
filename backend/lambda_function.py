@@ -31,7 +31,9 @@ def lambda_handler(event, context):
             body = event
 
         input_text = body.get("text", "")
-        input_url = body.get("url", "")
+        input_url  = body.get("url", "")
+        languages  = body.get("languages", ["en"])
+        dengbej_mode = body.get("dengbej_mode", False)
 
         if input_url:
             print("Fetching article:", input_url)
@@ -40,31 +42,27 @@ def lambda_handler(event, context):
         if not input_text:
             return create_response(400, {"error": "No text or URL provided"})
 
-        print("Generating English summary")
+        print(f"Generating English summary (dengbej_mode={dengbej_mode})")
+        summary_en = generate_summary(input_text, dengbej_mode)
 
-        english_summary = generate_summary(input_text)
+        response_body = {"summary_en": summary_en}
 
-        print("Translating to Kurdish")
+        if "ku" in languages:
+            print("Translating to Kurdish")
+            response_body["summary_ku"] = translate_text(summary_en, "Kurdish Kurmanji")
 
-        kurdish_text = translate_to_kurdish(english_summary)
+        if "tr" in languages:
+            print("Translating to Turkish")
+            response_body["summary_tr"] = translate_text(summary_en, "Turkish")
 
         print("Generating audio")
-
-        audio_stream = synthesize_speech(english_summary)
+        audio_stream = synthesize_speech(summary_en)
 
         print("Uploading to S3")
+        response_body["audio_url"] = upload_to_s3(audio_stream)
+        response_body["timestamp"] = datetime.utcnow().isoformat()
 
-        audio_url = upload_to_s3(audio_stream)
-
-        return create_response(
-            200,
-            {
-                "summary": english_summary,
-                "kurdish_text": kurdish_text,
-                "audio_url": audio_url,
-                "timestamp": datetime.utcnow().isoformat(),
-            },
-        )
+        return create_response(200, response_body)
 
     except Exception as e:
 
@@ -107,75 +105,58 @@ def fetch_article_content(url):
 
 
 # ---------------------------------------------
-# Generate storytelling summary
+# Generate English summary (normal or dengbej mode)
 # ---------------------------------------------
-def generate_summary(text):
+def generate_summary(text, dengbej_mode=False):
 
-    prompt = f"""
-You are a Kurdish dengbej storyteller.
+    if dengbej_mode:
+        prompt = f"""You are a Kurdish dengbej storyteller.
 
-Turn the following article into a short storytelling narrative that sounds like a traditional dengbej oral story.
+Rewrite the following text in a poetic, emotional storytelling style inspired by the dengbej oral tradition.
+Use vivid imagery, rhythm, and narrative flow. Keep it to 2 short paragraphs.
 
-Make it emotional and engaging.
-
-Keep it 2 short paragraphs.
-
-Article:
+Text:
 {text}
 
-Story:
-"""
+Dengbej Story:"""
+    else:
+        prompt = f"""Summarise the following text in clear, concise English.
+Write 3 to 5 sentences. Be factual and easy to understand.
+
+Text:
+{text}
+
+Summary:"""
+
+    return invoke_bedrock(prompt, max_tokens=500)
+
+
+# ---------------------------------------------
+# Translate English text to a target language
+# ---------------------------------------------
+def translate_text(text, target_language):
+
+    prompt = f"""Translate the following English text into {target_language}.
+Keep the tone and meaning of the original. Return only the translation.
+
+Text:
+{text}
+
+{target_language} Translation:"""
+
+    return invoke_bedrock(prompt, max_tokens=800)
+
+
+# ---------------------------------------------
+# Shared Bedrock invocation helper
+# ---------------------------------------------
+def invoke_bedrock(prompt, max_tokens=500):
 
     request_body = {
         "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 500,
+        "max_tokens": max_tokens,
         "temperature": 0.7,
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
-    }
-
-    response = bedrock_runtime.invoke_model(
-        modelId=MODEL_ID,
-        body=json.dumps(request_body),
-    )
-
-    response_body = json.loads(response["body"].read())
-
-    return response_body["content"][0]["text"].strip()
-
-
-# ---------------------------------------------
-# Translate to Kurdish
-# ---------------------------------------------
-def translate_to_kurdish(text):
-
-    prompt = f"""
-Translate the following story into Kurdish Kurmanji.
-
-Make it sound like a dengbej storytelling narration.
-
-Keep poetic tone and emotion.
-
-Story:
-{text}
-
-Kurdish Kurmanji Translation:
-"""
-
-    request_body = {
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 800,
-        "temperature": 0.7,
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
+        "messages": [{"role": "user", "content": prompt}],
     }
 
     response = bedrock_runtime.invoke_model(
