@@ -148,14 +148,11 @@ def format_briefing(briefing):
 
 
 def cors_response(status_code, body):
-    """Return response with CORS headers."""
+    """Return response with appropriate headers."""
     return {
         "statusCode": status_code,
         "headers": {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
             "Cache-Control": "public, max-age=300",
         },
         "body": json.dumps(body, cls=DecimalEncoder) if isinstance(body, dict) else body,
