@@ -69,3 +69,11 @@ variable "processor_function_name" {
   type        = string
   default     = "dengbej-ai-todays-five-processor"
 }
+
+# ─── News API (Read-only public endpoint) ────────────────────────────────────
+
+variable "news_api_function_name" {
+  description = "Lambda function name for news API"
+  type        = string
+  default     = "dengbej-ai-news-api"
+}

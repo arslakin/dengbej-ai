@@ -109,3 +109,5 @@ terraform.tfvars
 *.pid
 *.seed*.so
 *.so
+
+infrastructure/news_api.zip

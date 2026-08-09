@@ -83,3 +83,15 @@ output "processor_function_arn" {
   description = "Processor Lambda function ARN"
   value       = aws_lambda_function.processor.arn
 }
+
+# ─── News API Outputs ─────────────────────────────────────────────────────────
+
+output "news_api_function_name" {
+  description = "News API Lambda function name"
+  value       = aws_lambda_function.news_api.function_name
+}
+
+output "news_api_function_url" {
+  description = "News API public URL"
+  value       = aws_lambda_function_url.news_api.function_url
+}
