@@ -30,6 +30,7 @@ Multi-program membership:
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Set
+import re
 
 
 @dataclass
@@ -190,42 +191,64 @@ def classify_story_deterministic(headline: str, summary: str, category: str = ""
 
     Returns programs the story likely belongs to based on keyword/entity matching.
     """
-    text = f"{headline} {summary} {category}".lower()
+    headline_lower = headline.lower()
+    summary_lower = summary.lower()
+    category_lower = category.lower()
+
+    # Tokenize text for word-boundary matching
+    headline_tokens = set(re.findall(r'\b[a-zçêîşûüö]+\b', headline_lower))
+    summary_tokens = set(re.findall(r'\b[a-zçêîşûüö]+\b', summary_lower))
+    all_tokens = headline_tokens | summary_tokens
+
+    # Combined text for multi-word phrase matching (with word boundaries)
+    full_text = f" {headline_lower} {summary_lower} {category_lower} "
+
     programs = set()
     reasons = []
 
     # Kurdish regional programs
-    if any(ind in text for ind in BAKUR_INDICATORS):
+    if _matches_indicators(BAKUR_INDICATORS, all_tokens, full_text, headline_tokens):
         programs.add("bakur")
         programs.add("kurdistan")
         reasons.append("Kurdish-Turkey indicators found")
 
-    if any(ind in text for ind in ROJAVA_INDICATORS):
+    if _matches_indicators(ROJAVA_INDICATORS, all_tokens, full_text, headline_tokens):
         programs.add("rojava")
         programs.add("kurdistan")
         reasons.append("Rojava/NE Syria indicators found")
 
-    if any(ind in text for ind in BASUR_INDICATORS):
+    if _matches_indicators(BASUR_INDICATORS, all_tokens, full_text, headline_tokens):
         programs.add("basur")
         programs.add("kurdistan")
         reasons.append("Kurdistan Region/Iraq indicators found")
 
-    if any(ind in text for ind in ROJHILAT_INDICATORS):
+    if _matches_indicators(ROJHILAT_INDICATORS, all_tokens, full_text, headline_tokens):
         programs.add("rojhilat")
         programs.add("kurdistan")
         reasons.append("Kurdish-Iran indicators found")
 
-    # General programs
-    if any(ind in text for ind in TURKEY_INDICATORS):
-        programs.add("turkey")
-        reasons.append("Turkey indicators found")
+    # General programs — headline match is strong, description-only is weaker
+    # For country programs: require headline presence OR co-occurrence with Kurdish indicators
+    turkey_matched = _matches_indicators(TURKEY_INDICATORS, all_tokens, full_text, headline_tokens)
+    if turkey_matched:
+        # Only classify as Turkey if:
+        # 1. Turkey indicator appears in the headline, OR
+        # 2. Turkey indicator + Kurdish/relevant indicator co-occur (contextual relevance)
+        turkey_in_headline = any(
+            (ind in headline_tokens if " " not in ind else bool(re.search(r'\b' + re.escape(ind) + r'\b', headline_lower)))
+            for ind in TURKEY_INDICATORS
+        )
+        has_other_relevance = "bakur" in programs or "kurdistan" in programs
+        if turkey_in_headline or has_other_relevance:
+            programs.add("turkey")
+            reasons.append("Turkey indicators found")
 
-    if any(ind in text for ind in MIDDLE_EAST_INDICATORS):
+    if _matches_indicators(MIDDLE_EAST_INDICATORS, all_tokens, full_text, headline_tokens):
         programs.add("middle-east")
         reasons.append("Middle East indicators found")
 
     # World is a fallback — most international stories qualify
-    if not programs or category in ("world", "conflict", "economy", "climate", "technology"):
+    if not programs or category_lower in ("world", "conflict", "economy", "climate", "technology"):
         programs.add("world")
 
     # Today's news always includes top stories regardless of topic
@@ -236,6 +259,45 @@ def classify_story_deterministic(headline: str, summary: str, category: str = ""
         confidence=0.7 if len(programs) > 2 else 0.85,
         reasoning="; ".join(reasons) if reasons else "General/world news",
     )
+
+
+def _matches_indicators(indicators: set, all_tokens: set, full_text: str,
+                         headline_tokens: set, require_headline: bool = False) -> bool:
+    """
+    Check if any indicator matches using word-boundary-aware logic.
+
+    Single-word indicators: matched against tokenized word sets (exact word match).
+    Multi-word indicators: matched as phrases with word boundaries in full text.
+
+    Args:
+        indicators: Set of indicator strings
+        all_tokens: All individual words from headline + description
+        full_text: Padded lowercase text for phrase matching
+        headline_tokens: Words from headline only
+        require_headline: If True, at least one match must be in the headline
+    """
+    headline_matched = False
+    any_matched = False
+
+    for ind in indicators:
+        if " " in ind:
+            # Multi-word phrase: use word-boundary regex
+            pattern = r'\b' + re.escape(ind) + r'\b'
+            if re.search(pattern, full_text):
+                any_matched = True
+                # Check if phrase appears in headline portion
+                if re.search(pattern, f" {' '.join(headline_tokens)} "):
+                    headline_matched = True
+        else:
+            # Single-word: exact token match (prevents substring false positives)
+            if ind in all_tokens:
+                any_matched = True
+                if ind in headline_tokens:
+                    headline_matched = True
+
+    if require_headline:
+        return headline_matched or (any_matched and headline_matched)
+    return any_matched
 
 
 def get_program(program_id: str) -> Optional[Program]:
