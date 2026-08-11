@@ -213,46 +213,67 @@ Source: {story.get('primary_source', '')}"""
     stories_text = "\n\n".join(story_blocks)
     story_count = len(stories)
 
-    # Adapt structure based on story count
-    if story_count == 1:
-        structure_instruction = "Tell this single story in detail (5-8 sentences). No transitions needed."
-        target_length = "300-500 words"
-    elif story_count == 2:
-        structure_instruction = "Tell both stories with a brief transition between them."
-        target_length = "400-600 words"
-    else:
-        structure_instruction = f"Tell all {story_count} stories as one coherent program with varied transitions."
-        target_length = "500-900 words"
+    prompt = f"""You are composing a Kurmanji Kurdish news segment for Dengbej audio service.
+Program: {program_id} | Date: {date_str} | Stories: {story_count}
 
-    prompt = f"""You are composing a Kurmanji Kurdish topic briefing for Dengbej audio service.
-Program: {program_id}
+IMPORTANT — DUPLICATE DETECTION:
+Multiple source stories below may describe the SAME event from different publishers.
+If stories overlap, synthesize them into ONE segment. Do NOT narrate each source separately.
+State each fact ONLY ONCE. Different sources may add different details — combine them.
 
-LANGUAGE AND STYLE:
-- Write DIRECTLY in natural, fluent Kurmanji Kurdish
-- Use standard, widely understood Kurmanji vocabulary
-- Write short-to-medium sentences suitable for being read aloud on radio
-- Vary sentence structure — avoid repetition
-- Use natural Kurdish number expressions
-- Keep proper nouns in their recognized form
-- Avoid mixing Turkish or English syntax into Kurdish sentences
-- Do NOT use the characters "ğ" or "ı" — these are Turkish, not Kurmanji
+LANGUAGE RULES:
+- Write DIRECTLY in natural Kurmanji Kurdish
+- Use ONLY standard, widely understood Kurmanji vocabulary
+- If you are uncertain about a Kurdish word, use a simpler established expression instead
+- NEVER invent a Kurdish-looking word — if no standard term exists, describe it simply
+- NEVER insert English words (no "clear", "process", "deal", etc.)
+- Avoid unnecessary Turkish vocabulary
+- Linguistic simplicity is always preferable to uncertain vocabulary
+- Do NOT use the characters "ğ" or "ı"
+
+NUMBER ACCURACY (CRITICAL):
+- Preserve the EXACT semantic value of every number from the source material
+- 40 = çil (NOT çardeh which means 14)
+- 14 = çardeh
+- "four decades" = nêzîkî çil sal
+- "thousands" = bi hezaran
+- If uncertain how to write a number in Kurmanji, keep the numeric form (e.g., "40") rather than risk changing its value
+- NEVER transform a number in a way that changes the underlying quantity
+
+GEOGRAPHIC TERMINOLOGY:
+- Rojhilata Navîn = Middle East (NEVER "Rojava Navîn")
+- Rojava = western Kurdistan / Kurdish region in Syria
+- Bakur = northern Kurdistan / Kurdish region in Turkey
+- Başûr = southern Kurdistan / Kurdistan Region of Iraq
+- Rojhilat = eastern Kurdistan / Kurdish region in Iran
 
 FACTUAL RULES:
-- Use ONLY facts from the supplied stories — do NOT invent anything
-- Preserve exact numbers, casualty figures, percentages, dates, and names
-- Do NOT add analysis, opinion, or interpretation beyond what sources state
-- Do NOT invent quotations
-- Do NOT present Dengbej as a human journalist or eyewitness
+- Use ONLY facts from the supplied stories
+- Do NOT invent facts, quotes, or background context not in the sources
+- Do NOT present Dengbej as a human journalist
+- If a source provides only a headline with minimal detail, produce a SHORT bulletin
+- Do NOT repeat a headline in different words merely to fill space
+
+LENGTH AND REPETITION:
+- Length must match available factual material — never pad
+- A thin story (only headline + brief description) → 2-3 sentences maximum
+- A detailed story → 3-5 sentences
+- NEVER repeat the same fact in different words to increase length
+- If all stories are about the same event, produce ONE concise combined segment
+- A very short accurate broadcast is acceptable and preferable to a padded one
 
 STRUCTURE:
 - Opening: "Rojbaş. Ev Dengbej e. {date_str}."
-- {structure_instruction}
+- Tell the story/stories concisely with natural transitions if multiple
 - Closing: "Ev bû Dengbej. Hêvî dikin ku sibê jî li gel we bin."
 
 OUTPUT:
-- Write ONLY the spoken text — no stage directions, no labels, no formatting
-- Target {target_length} of natural spoken Kurmanji
-- The result should sound like a professional Kurdish radio news segment
+- Write ONLY the spoken text — no labels, no formatting, no stage directions
+- The result should sound like a concise Kurdish radio news segment
+
+SELF-CHECK (do this internally before outputting, do NOT include in output):
+- No invented facts? No changed numbers? No English words? No invented vocabulary?
+- No unnecessary repetition? Geographic terms correct? Overlapping stories consolidated?
 
 STORIES:
 
