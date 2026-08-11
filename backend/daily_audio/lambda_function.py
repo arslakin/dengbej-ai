@@ -139,52 +139,55 @@ def get_processed_briefing(date_str):
 def generate_broadcast_script(stories, date_str, telemetry):
     """Generate a coherent Kurdish broadcast script from processed stories."""
 
-    # Build story summaries for the prompt
+    # Build story summaries for the prompt — provide BOTH English and Kurdish
     story_blocks = []
     for i, story in enumerate(stories, 1):
         block = f"""Story {i}:
 Headline: {story.get('headline', '')}
 Category: {story.get('category', '')}
-Summary (Kurdish): {story.get('summary_ku', story.get('summary_en', ''))}
+English summary: {story.get('summary_en', '')}
+Kurdish summary: {story.get('summary_ku', '')}
 Source: {story.get('primary_source', '')}"""
         story_blocks.append(block)
 
     stories_text = "\n\n".join(story_blocks)
 
-    prompt = f"""You are preparing a Kurdish-language (Kurmanji) daily news briefing for Dengbej, a Kurdish news audio service.
+    prompt = f"""You are composing a Kurmanji Kurdish daily news briefing for Dengbej audio service.
 
-STRICT RULES:
-- Use ONLY information contained in the supplied stories below
-- Do NOT invent facts, quotes, statistics, or analysis not present in the source material
-- Do NOT add commentary or opinion beyond what the sources report
-- Do NOT present Dengbej as a human journalist or reporter
-- Use calm, natural radio-style Kurmanji Kurdish
-- Preserve important names, places, dates, and numbers accurately
-- When sources express uncertainty, reflect that uncertainty
-- Avoid sensational language
+LANGUAGE AND STYLE:
+- Write DIRECTLY in natural, fluent Kurmanji Kurdish — do NOT translate English sentence-by-sentence
+- Use standard, widely understood Kurmanji vocabulary
+- Write short-to-medium sentences suitable for being read aloud on radio
+- Vary sentence structure and transition phrases — avoid repetition
+- Use natural Kurdish number expressions: "sêzdeh kes" not "13 kes", "sê ji sed" not "%3"
+- For currencies and measurements, use natural spoken forms: "heştê û çar dolar" not "84.64 dolar"
+- Keep proper nouns in their recognized form (Netanyahu, Erdogan, Hormuz, Taneco)
+- Use standard Kurdish political terminology where established
+- Avoid mixing Turkish or English syntax into Kurdish sentences
+- Avoid bookish or overly formal Arabic/Persian loans when simpler Kurdish exists
+- Do NOT use the characters "ğ" or "ı" — these are Turkish, not Kurmanji
+
+FACTUAL RULES:
+- Use ONLY facts from the supplied stories — do NOT invent anything
+- Preserve exact numbers, casualty figures, percentages, dates, and names
+- When a source expresses uncertainty, keep that uncertainty in your text
+- Do NOT add analysis, opinion, or interpretation beyond what sources state
+- Do NOT invent quotations or attribute statements not in the source material
+- Do NOT present Dengbej as a human journalist or eyewitness
 
 STRUCTURE:
-1. Brief opening: "Rojbaş. Ev Dengbej e. Nûçeyên îro, {date_str}."
-2. Story 1 — the most important story, told naturally
-3. Brief transition to Story 2
-4. Story 2
-5. Brief transition to Story 3
-6. Story 3
-7. Brief transition to Story 4
-8. Story 4
-9. Brief transition to Story 5
-10. Story 5
-11. Brief closing: "Ev bû Dengbej. Soz didin ku sibehê jî li gel we bin."
+- Opening: "Rojbaş. Ev Dengbej e. Nûçeyên îro, {date_str}."
+- Tell the five stories as one coherent program with varied transitions
+- Do NOT start every transition with "Niha" — use variety: "Li aliyekî din...", "Derbarê...", "Di nûçeyên din de...", etc.
+- Each story: 3-5 sentences, focused on key facts
+- Closing: "Ev bû Dengbej. Hêvî dikin ku sibê jî li gel we bin."
 
-STYLE:
-- Natural spoken Kurmanji — as if reading aloud on radio
-- Vary sentence length for natural rhythm
-- Do NOT use identical transition phrases for each story
-- Do NOT include stage directions, speaker labels, or formatting
-- Output ONLY the text that would be spoken aloud
-- Target approximately 800-1200 words total
+OUTPUT:
+- Write ONLY the spoken text — no stage directions, no labels, no formatting
+- Target 700-1000 words of natural spoken Kurmanji
+- The result should sound like a professional Kurdish radio news bulletin
 
-TODAY'S STORIES:
+TODAY'S STORIES (use as factual source material, not text to translate literally):
 
 {stories_text}
 
