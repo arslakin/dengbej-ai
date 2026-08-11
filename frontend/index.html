@@ -218,12 +218,15 @@
     var briefingData = null;
 
     var PROGRAMS = [
-      { id: "today", label_ku: "Nûçeyên Îro", label_en: "Today's News", available: true },
-      { id: "kurdistan", label_ku: "Behsa Kurdistanê bike", label_en: "About Kurdistan", available: false },
-      { id: "world", label_ku: "Behsa dinyayê bike", label_en: "World News", available: false },
-      { id: "middle-east", label_ku: "Behsa Rojhilata Navîn bike", label_en: "Middle East", available: false },
-      { id: "turkey", label_ku: "Behsa Tirkiyeyê bike", label_en: "About Turkey", available: false },
-      { id: "bakur", label_ku: "Behsa Bakur bike", label_en: "Northern Kurdistan", available: false }
+      { id: "today", label_ku: "Nûçeyên Îro", label_en: "Today's News", available: true, group: "general" },
+      { id: "kurdistan", label_ku: "Behsa Kurdistanê bike", label_en: "About Kurdistan", available: false, group: "general" },
+      { id: "world", label_ku: "Behsa dinyayê bike", label_en: "World News", available: false, group: "general" },
+      { id: "middle-east", label_ku: "Behsa Rojhilata Navîn bike", label_en: "Middle East", available: false, group: "general" },
+      { id: "turkey", label_ku: "Behsa Tirkiyeyê bike", label_en: "About Turkey", available: false, group: "general" },
+      { id: "bakur", label_ku: "Behsa Bakur bike", label_en: "Northern Kurdistan", available: false, group: "kurdish-regions" },
+      { id: "rojava", label_ku: "Behsa Rojava bike", label_en: "Rojava", available: false, group: "kurdish-regions" },
+      { id: "basur", label_ku: "Behsa Başûr bike", label_en: "Southern Kurdistan", available: false, group: "kurdish-regions" },
+      { id: "rojhilat", label_ku: "Behsa Rojhilat bike", label_en: "Eastern Kurdistan", available: false, group: "kurdish-regions" }
     ];
     var selectedProgram = "today";
 
