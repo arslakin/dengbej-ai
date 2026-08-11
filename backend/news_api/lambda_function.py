@@ -130,6 +130,10 @@ def format_program(item):
             "feed_description": story.get("feed_description"),
         })
 
+    # Script and audio metadata
+    script_ku = item.get("script_ku")
+    audio_url = item.get("audio_url")
+
     return {
         "program_id": item.get("program_id"),
         "label_ku": item.get("label_ku", ""),
@@ -137,6 +141,11 @@ def format_program(item):
         "generated_at": item.get("generated_at"),
         "story_count": len(formatted),
         "stories": formatted,
+        "script_ku": script_ku if script_ku else None,
+        "audio": {
+            "available": bool(audio_url),
+            "url": audio_url,
+        },
     }
 
 

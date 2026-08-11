@@ -158,6 +158,49 @@
       .loading-dots::after { animation: none; content: '...'; }
       * { transition: none !important; }
     }
+    /* Radio Program Card */
+    .radio-card {
+      background: var(--bg-listen); border-radius: 8px; padding: 1.5rem;
+      margin-bottom: 2rem; border: 1px solid var(--border);
+    }
+    .radio-card-header {
+      margin-bottom: 1rem;
+    }
+    .radio-card-title {
+      font-family: Georgia, serif; font-size: 1.15rem; font-weight: 700;
+      color: var(--text-primary); margin-bottom: 0.2rem;
+    }
+    .radio-card-subtitle {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.78rem; color: var(--text-muted);
+    }
+    .radio-card-action {
+      display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;
+    }
+    .radio-card-status {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.75rem; color: var(--text-muted);
+    }
+    .radio-card-script {
+      font-family: Georgia, serif; font-size: 0.92rem; line-height: 1.7;
+      color: var(--text-secondary); font-style: italic;
+      padding: 1rem; background: rgba(255,255,255,0.5); border-radius: 6px;
+      white-space: pre-wrap;
+    }
+    .radio-card-empty {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.9rem; color: var(--text-muted); text-align: center;
+      padding: 1.5rem 0;
+    }
+    .radio-card-empty .empty-ku {
+      font-family: Georgia, serif; font-size: 1rem; color: var(--text-secondary);
+      margin-bottom: 0.4rem;
+    }
+    @media (max-width: 599px) {
+      .radio-card { padding: 1.25rem; }
+      .radio-card-action { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+      .radio-card-script { font-size: 0.88rem; padding: 0.75rem; }
+    }
   </style>
 </head>
 <body>
@@ -402,13 +445,7 @@
         var res = await fetch(API_URL + "/news/program/" + programId);
         if (!res.ok) throw new Error(res.status);
         var data = await res.json();
-        if (data.stories && data.stories.length > 0) {
-          renderProgramStories(data);
-        } else {
-          storiesContainer.innerHTML = '<div class="state-container"><p>' +
-            (currentLang === "ku" ? "Niha nûçeyên vê bernameyê nîn in." : "No stories available for this program right now.") +
-            '</p></div>';
-        }
+        renderProgramView(data, programId);
       } catch (err) {
         storiesContainer.innerHTML = '<div class="state-container"><p>' +
           (currentLang === "ku" ? "Nebû ku bernameyê bar bikin." : "Could not load this program.") +
@@ -416,32 +453,83 @@
       }
     }
 
-    function renderProgramStories(data) {
-      // Reuse same rendering as Today's 5
+    function renderProgramView(data, programId) {
+      var prog = PROGRAMS.find(function(p) { return p.id === programId; });
+      var labelKu = prog ? prog.label_ku : data.label_ku || programId;
+      var labelEn = prog ? prog.label_en : data.label_en || programId;
       var stories = data.stories || [];
-      var html = "";
-      stories.forEach(function(story, i) {
-        var rank = String(i + 1).padStart(2, "0");
-        var category = story.category || data.program_id || "world";
-        var headline = story.headline || "";
-        var summary = story.feed_description || "";
-        var source = story.primary_source ? story.primary_source.name : "";
-        var sourceUrl = story.primary_source ? story.primary_source.url : "";
-        var time = timeAgo(story.published_at);
-        var supporting = (story.supporting_sources || []).map(function(s) { return s.name; }).filter(Boolean);
-        html += '<article class="story">';
-        html += '<div class="story-rank">' + rank + '</div>';
-        html += '<span class="story-category" style="color:' + getCategoryColor(category) + '">' + escapeHtml(category) + '</span>';
-        html += '<h3 class="story-headline">' + escapeHtml(headline) + '</h3>';
-        if (summary) html += '<p class="story-summary">' + escapeHtml(summary) + '</p>';
-        html += '<div class="story-footer">';
-        if (source) html += '<span class="story-source">Source: ' + escapeHtml(source) + '</span>';
-        if (supporting.length) html += '<span>Also: ' + supporting.map(function(s) { return escapeHtml(s); }).join(", ") + '</span>';
-        if (sourceUrl) html += '<a class="story-link" href="' + escapeHtml(sourceUrl) + '" target="_blank" rel="noopener noreferrer">Read original →</a>';
-        if (time) html += '<span class="story-time">' + time + '</span>';
-        html += '</div></article>';
-      });
+      var scriptKu = data.script_ku || null;
+      var audioAvailable = data.audio && data.audio.available && data.audio.url;
+      var storyCount = data.story_count || stories.length;
+
+      var html = '';
+
+      // Radio Card
+      html += '<div class="radio-card">';
+
+      if (storyCount === 0) {
+        // Empty program — intentional editorial state
+        html += '<div class="radio-card-empty">';
+        html += '<p class="empty-ku">Niha nûçeyên vê bernameyê nîn in.</p>';
+        html += '<p>No relevant stories are available in this program right now.</p>';
+        html += '</div>';
+      } else {
+        // Header
+        html += '<div class="radio-card-header">';
+        html += '<h2 class="radio-card-title">' + escapeHtml(labelKu) + '</h2>';
+        html += '<p class="radio-card-subtitle">' + escapeHtml(labelEn) + ' · ' + storyCount + (currentLang === "ku" ? " nûçe" : " stories") + '</p>';
+        html += '</div>';
+
+        // Action row
+        html += '<div class="radio-card-action">';
+        if (audioAvailable) {
+          html += '<button class="beje-btn" onclick="playAudio(\'' + escapeHtml(data.audio.url) + '\')" aria-label="' + (currentLang === "ku" ? "Bibihîze" : "Listen") + '">Bêje! ▶</button>';
+          html += '<span class="radio-card-status">' + (currentLang === "ku" ? "Dengê Kurdî amade ye" : "Kurdish audio ready") + '</span>';
+        } else {
+          html += '<button class="beje-btn" disabled aria-label="' + (currentLang === "ku" ? "Deng hîn amade nîne" : "Audio not yet available") + '">Bêje!</button>';
+          html += '<span class="radio-card-status">' + (currentLang === "ku" ? "Deng tê amadekirin" : "Audio coming soon") + '</span>';
+        }
+        html += '</div>';
+
+        // Kurmanji narration
+        if (scriptKu) {
+          html += '<div class="radio-card-script" lang="ku">' + escapeHtml(scriptKu) + '</div>';
+        }
+      }
+
+      html += '</div>';
+
+      // Stories underneath
+      if (stories.length > 0) {
+        stories.forEach(function(story, i) {
+          var rank = String(i + 1).padStart(2, "0");
+          var category = story.category || programId;
+          var headline = story.headline || "";
+          var summary = story.feed_description || "";
+          var source = story.primary_source ? story.primary_source.name : "";
+          var sourceUrl = story.primary_source ? story.primary_source.url : "";
+          var time = timeAgo(story.published_at);
+          var supporting = (story.supporting_sources || []).map(function(s) { return s.name; }).filter(Boolean);
+          html += '<article class="story">';
+          html += '<div class="story-rank">' + rank + '</div>';
+          html += '<span class="story-category" style="color:' + getCategoryColor(category) + '">' + escapeHtml(category) + '</span>';
+          html += '<h3 class="story-headline">' + escapeHtml(headline) + '</h3>';
+          if (summary) html += '<p class="story-summary">' + escapeHtml(summary) + '</p>';
+          html += '<div class="story-footer">';
+          if (source) html += '<span class="story-source">Source: ' + escapeHtml(source) + '</span>';
+          if (supporting.length) html += '<span>Also: ' + supporting.map(function(s) { return escapeHtml(s); }).join(", ") + '</span>';
+          if (sourceUrl) html += '<a class="story-link" href="' + escapeHtml(sourceUrl) + '" target="_blank" rel="noopener noreferrer">Read original →</a>';
+          if (time) html += '<span class="story-time">' + time + '</span>';
+          html += '</div></article>';
+        });
+      }
+
       storiesContainer.innerHTML = html;
+    }
+
+    function playAudio(url) {
+      // Future: implement audio playback
+      console.log("Audio URL:", url);
     }
 
     setLanguage(currentLang);
