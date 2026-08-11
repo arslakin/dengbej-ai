@@ -24,9 +24,8 @@ from decimal import Decimal
 import boto3
 from botocore.exceptions import ClientError
 
-# Add parent path for program_classifier import
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from program_classifier.programs import (
+# Import program classifier (bundled locally)
+from programs import (
     classify_story_deterministic, PROGRAMS, PROGRAM_MAP, PROGRAM_IDS
 )
 
