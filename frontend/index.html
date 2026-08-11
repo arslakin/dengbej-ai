@@ -4,393 +4,254 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dengbej — News Worth Hearing</title>
-  <meta name="description" content="A daily briefing of five important global stories, summarized in English and Kurdish.">
+  <meta name="description" content="A daily briefing of five important global stories, summarized in English and Kurdish Kurmanji.">
   <meta property="og:title" content="Dengbej — News Worth Hearing">
-  <meta property="og:description" content="Five important global stories, curated daily. Available in English and Kurdish Kurmanji.">
+  <meta property="og:description" content="Five global stories, curated daily. In English and Kurdish.">
   <meta property="og:type" content="website">
   <style>
     :root {
-      --text-primary: #1a1a1a;
-      --text-secondary: #555;
-      --text-muted: #888;
-      --bg-primary: #fafaf8;
-      --bg-card: #fff;
-      --accent: #8b4513;
-      --accent-light: #f4ede7;
-      --border: #e8e4df;
-      --link: #2a5298;
-      --category-conflict: #c62828;
-      --category-politics: #1565c0;
-      --category-human-rights: #6a1b9a;
-      --category-economy: #2e7d32;
-      --category-health: #00695c;
-      --category-migration: #e65100;
-      --category-climate: #1b5e20;
-      --category-technology: #4527a0;
-      --category-culture: #bf360c;
-      --category-world: #37474f;
+      --text-primary: #111; --text-secondary: #444; --text-muted: #777;
+      --bg-page: #faf9f7; --bg-listen: #f5f0ea;
+      --accent: #7a3b10; --accent-hover: #5c2d0c; --accent-light: #f5ede4;
+      --border: #e5e0d8; --link: #1a4a8a; --link-hover: #0d3266;
+      --cat-conflict: #b71c1c; --cat-politics: #1565c0; --cat-human-rights: #6a1b9a;
+      --cat-economy: #2e7d32; --cat-health: #00695c; --cat-migration: #e65100;
+      --cat-climate: #1b5e20; --cat-technology: #4527a0; --cat-culture: #bf360c;
+      --cat-world: #37474f;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: Georgia, 'Times New Roman', serif;
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      line-height: 1.7;
-      -webkit-font-smoothing: antialiased;
+      background: var(--bg-page); color: var(--text-primary);
+      line-height: 1.7; -webkit-font-smoothing: antialiased;
     }
-    .ui-font {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
-    .container {
-      max-width: 680px;
-      margin: 0 auto;
-      padding: 0 1.25rem;
-    }
+    .container { max-width: 700px; margin: 0 auto; padding: 0 1.25rem; }
     /* Header */
-    header {
-      border-bottom: 1px solid var(--border);
-      padding: 1.5rem 0 1rem;
-      text-align: center;
-    }
+    header { padding: 1.5rem 0 1.25rem; border-bottom: 1px solid var(--border); }
+    .header-inner { display: flex; justify-content: space-between; align-items: center; }
     .wordmark {
-      font-size: 1.75rem;
-      font-weight: bold;
-      letter-spacing: 0.15em;
-      color: var(--text-primary);
-    }
-    .subtitle {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      margin-top: 0.2rem;
+      font-size: 1.3rem; font-weight: 700; letter-spacing: 0.18em; color: var(--text-primary);
     }
-    .header-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 1rem;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.78rem;
-      color: var(--text-muted);
-    }
-    .date-display { letter-spacing: 0.02em; }
-    /* Language Toggle */
-    .lang-toggle {
-      display: inline-flex;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      overflow: hidden;
-    }
+    .lang-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
     .lang-toggle button {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.78rem;
-      padding: 0.3rem 0.7rem;
-      border: none;
-      background: transparent;
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: background 0.2s, color 0.2s;
+      font-size: 0.78rem; padding: 0.35rem 0.75rem; border: none;
+      background: transparent; color: var(--text-secondary); cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
     }
-    .lang-toggle button:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: -2px;
+    .lang-toggle button:hover { background: var(--accent-light); }
+    .lang-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .lang-toggle button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+    /* Section Intro */
+    .section-intro { padding: 2rem 0 1.5rem; }
+    .section-intro h2 {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 0.4rem;
     }
-    .lang-toggle button.active {
-      background: var(--accent);
-      color: #fff;
+    .section-intro p { font-size: 1.05rem; color: var(--text-secondary); }
+    .section-intro .date {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;
     }
-    /* Main */
-    main { padding: 2rem 0; }
-    /* Story Cards */
-    .story {
-      border-bottom: 1px solid var(--border);
-      padding: 1.75rem 0;
+    /* Listen Area */
+    .listen-area { background: var(--bg-listen); border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; }
+    .listen-inner { display: flex; align-items: flex-start; gap: 1rem; }
+    .listen-play { font-size: 1.5rem; color: var(--accent); line-height: 1; flex-shrink: 0; margin-top: 0.1rem; }
+    .listen-text h3 {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem;
     }
-    .story:first-child { padding-top: 0; }
+    .listen-text .listen-meta {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.4rem;
+    }
+    .listen-text .listen-note {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.75rem; color: var(--text-muted);
+    }
+    /* Stories */
+    .story { border-bottom: 1px solid var(--border); padding: 1.75rem 0; }
     .story:last-child { border-bottom: none; }
-    .story-meta {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 0.5rem;
-    }
     .story-rank {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      font-weight: 600;
+      font-size: 1.6rem; font-weight: 700; color: var(--border); line-height: 1; margin-bottom: 0.5rem;
     }
     .story-category {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.7rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+      font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.1em; margin-bottom: 0.4rem; display: inline-block;
     }
-    .story-headline {
-      font-size: 1.5rem;
-      font-weight: bold;
-      line-height: 1.3;
-      margin-bottom: 0.75rem;
-    }
-    .story-summary {
-      color: var(--text-secondary);
-      margin-bottom: 1rem;
-    }
+    .story-headline { font-size: 1.5rem; font-weight: 700; line-height: 1.3; margin-bottom: 0.75rem; }
+    .story-summary { font-size: 1rem; color: var(--text-secondary); line-height: 1.75; margin-bottom: 1rem; }
     .story-footer {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.5rem 1rem;
+      font-size: 0.78rem; color: var(--text-muted);
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 1rem;
     }
-    .story-source { font-weight: 500; }
+    .story-source { font-weight: 500; color: var(--text-secondary); }
     .story-link {
-      color: var(--link);
-      text-decoration: none;
+      color: var(--link); text-decoration: none; font-weight: 500; margin-left: auto;
     }
-    .story-link:hover { text-decoration: underline; }
+    .story-link:hover { color: var(--link-hover); text-decoration: underline; }
     .story-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    .story-time { color: var(--text-muted); }
     /* States */
-    .state-container {
-      text-align: center;
-      padding: 4rem 1rem;
-    }
+    .state-container { text-align: center; padding: 4rem 1rem; }
     .state-container p {
-      font-size: 1rem;
-      color: var(--text-secondary);
-      margin-bottom: 1.5rem;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 1.5rem;
     }
-    .loading-dots::after {
-      content: '';
-      animation: dots 1.5s steps(4, end) infinite;
-    }
-    @keyframes dots {
-      0% { content: ''; }
-      25% { content: '.'; }
-      50% { content: '..'; }
-      75% { content: '...'; }
-    }
+    .loading-dots::after { content: ''; animation: dots 1.5s steps(4, end) infinite; }
+    @keyframes dots { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
     .retry-btn {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.85rem;
-      padding: 0.5rem 1.2rem;
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
+      font-size: 0.85rem; padding: 0.55rem 1.4rem; background: var(--accent);
+      color: #fff; border: none; border-radius: 4px; cursor: pointer;
+      transition: background 0.15s ease;
     }
-    .retry-btn:hover { opacity: 0.9; }
+    .retry-btn:hover { background: var(--accent-hover); }
     .retry-btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
-    /* About */
-    .about-section {
-      border-top: 1px solid var(--border);
-      padding: 2rem 0;
-      text-align: center;
-    }
+    /* About & CTA */
+    .about-section { border-top: 1px solid var(--border); padding: 2.5rem 0 2rem; }
     .about-section h2 {
-      font-size: 1rem;
-      font-weight: bold;
-      margin-bottom: 0.5rem;
-    }
-    .about-section p {
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-      max-width: 520px;
-      margin: 0 auto;
-    }
-    /* Story Generator CTA */
-    .cta-section {
-      border-top: 1px solid var(--border);
-      padding: 1.5rem 0;
-      text-align: center;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.85rem;
-      color: var(--text-muted);
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 0.6rem;
     }
-    .cta-section a {
-      color: var(--link);
-      text-decoration: none;
-      font-weight: 500;
+    .about-section p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.7; max-width: 540px; }
+    .cta-section {
+      border-top: 1px solid var(--border); padding: 1.75rem 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.85rem; color: var(--text-muted);
     }
-    .cta-section a:hover { text-decoration: underline; }
+    .cta-section a { color: var(--link); text-decoration: none; font-weight: 500; }
+    .cta-section a:hover { color: var(--link-hover); text-decoration: underline; }
     .cta-section a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     /* Footer */
     footer {
-      border-top: 1px solid var(--border);
-      padding: 1.5rem 0 2.5rem;
-      text-align: center;
+      border-top: 1px solid var(--border); padding: 1.75rem 0 3rem;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      line-height: 1.8;
+      font-size: 0.75rem; color: var(--text-muted); text-align: center; line-height: 1.8;
     }
-    footer p { margin-bottom: 0.3rem; }
     /* Responsive */
-    @media (min-width: 600px) {
-      header { padding: 2rem 0 1.25rem; }
-      .wordmark { font-size: 2rem; }
-      .story-headline { font-size: 1.65rem; }
+    @media (max-width: 599px) {
+      .story-headline { font-size: 1.35rem; }
+      .story-rank { font-size: 1.4rem; }
+      .listen-area { padding: 1.25rem; }
+      .story-link { margin-left: 0; }
+    }
+    @media (min-width: 600px) and (max-width: 899px) {
+      .container { padding: 0 2rem; }
     }
     @media (min-width: 900px) {
-      .story-headline { font-size: 1.8rem; }
+      .story-headline { font-size: 1.6rem; }
+      header { padding: 2rem 0 1.5rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .loading-dots::after { animation: none; content: '...'; }
+      * { transition: none !important; }
     }
   </style>
 </head>
 <body>
   <header>
     <div class="container">
-      <h1 class="wordmark">DENGBEJ</h1>
-      <p class="subtitle">News Worth Hearing</p>
-      <div class="header-meta">
-        <span class="date-display" id="currentDate"></span>
+      <div class="header-inner">
+        <h1 class="wordmark">DENGBEJ</h1>
         <nav class="lang-toggle" aria-label="Language selection">
-          <button type="button" id="btn-en" class="active" aria-pressed="true">English</button>
+          <button type="button" id="btn-en" aria-pressed="true">English</button>
           <button type="button" id="btn-ku" aria-pressed="false">Kurdî</button>
         </nav>
       </div>
     </div>
   </header>
 
-  <main class="container" id="main-content">
-    <div class="state-container" id="loading-state">
-      <p class="loading-dots">Preparing today's briefing</p>
+  <main class="container" id="main-content" aria-live="polite">
+    <section class="section-intro">
+      <h2>Today's Dengbej</h2>
+      <p>The five stories you should know today.</p>
+      <p class="date" id="currentDate"></p>
+    </section>
+
+    <section class="listen-area" aria-label="Audio briefing" data-audio-url="">
+      <div class="listen-inner">
+        <span class="listen-play" aria-hidden="true">▶</span>
+        <div class="listen-text">
+          <h3>Listen to Today's Dengbej</h3>
+          <p class="listen-meta">5 stories · <span id="listenDate"></span></p>
+          <p class="listen-note">Audio briefing coming soon</p>
+        </div>
+      </div>
+    </section>
+
+    <div id="stories-container">
+      <div class="state-container" id="loading-state">
+        <p class="loading-dots">Preparing today's briefing</p>
+      </div>
     </div>
   </main>
 
   <div class="container">
     <section class="about-section" aria-labelledby="about-heading">
-      <h2 id="about-heading">What is Dengbej?</h2>
-      <p>Five important global stories each day, summarized clearly in English and Kurdish Kurmanji. Named after the Kurdish oral storytelling tradition of the dengbêj.</p>
+      <h2 id="about-heading">About</h2>
+      <p>Five important global stories. Selected daily from BBC News, Deutsche Welle, and Al Jazeera English. Summarized with AI. Available in English and Kurdish.</p>
     </section>
-
     <section class="cta-section">
-      Have an article you want summarized? <a href="story.html">Open Story Generator</a>
+      <p>Have an article you want summarized? <a href="story.html">Open Story Generator →</a></p>
     </section>
   </div>
 
   <footer>
     <div class="container">
-      <p>Sources: BBC News · Deutsche Welle · Al Jazeera English</p>
-      <p>Summaries are generated by AI. Always read the original reporting.</p>
-      <p>Inspired by the Kurdish dengbêj oral storytelling tradition.</p>
+      <p>Sources · About · Inspired by the dengbêj tradition</p>
     </div>
   </footer>
 
   <script>
-    // ─── Configuration ───────────────────────────────────────────
-    const API_URL = "https://77khte6fwkmwi5igfme5qezzga0kcnqv.lambda-url.us-east-1.on.aws";
-    const FALLBACK_API_URL = "";
+    var API_URL = "https://77khte6fwkmwi5igfme5qezzga0kcnqv.lambda-url.us-east-1.on.aws";
+    var currentLang = sessionStorage.getItem("dengbej-lang") || "en";
+    var briefingData = null;
 
-    // ─── State ───────────────────────────────────────────────────
-    let currentLang = sessionStorage.getItem("dengbej-lang") || "en";
-    let briefingData = null;
+    var storiesContainer = document.getElementById("stories-container");
+    var btnEn = document.getElementById("btn-en");
+    var btnKu = document.getElementById("btn-ku");
+    var dateEl = document.getElementById("currentDate");
+    var listenDateEl = document.getElementById("listenDate");
 
-    // ─── DOM refs ────────────────────────────────────────────────
-    const mainContent = document.getElementById("main-content");
-    const btnEn = document.getElementById("btn-en");
-    const btnKu = document.getElementById("btn-ku");
-    const dateEl = document.getElementById("currentDate");
-
-    // ─── Date display ────────────────────────────────────────────
-    dateEl.textContent = new Date().toLocaleDateString("en-US", {
+    var todayFormatted = new Date().toLocaleDateString("en-US", {
       weekday: "long", year: "numeric", month: "long", day: "numeric"
     });
+    dateEl.textContent = todayFormatted;
+    listenDateEl.textContent = new Date().toLocaleDateString("en-US", {
+      month: "long", day: "numeric", year: "numeric"
+    });
 
-    // ─── Language Toggle ─────────────────────────────────────────
     function setLanguage(lang) {
       currentLang = lang;
       sessionStorage.setItem("dengbej-lang", lang);
-      btnEn.classList.toggle("active", lang === "en");
-      btnKu.classList.toggle("active", lang === "ku");
       btnEn.setAttribute("aria-pressed", lang === "en");
       btnKu.setAttribute("aria-pressed", lang === "ku");
       document.documentElement.lang = lang === "ku" ? "ku" : "en";
       if (briefingData) renderBriefing(briefingData);
     }
 
-    btnEn.addEventListener("click", () => setLanguage("en"));
-    btnKu.addEventListener("click", () => setLanguage("ku"));
-
-    // Initialize toggle state
+    btnEn.addEventListener("click", function() { setLanguage("en"); });
+    btnKu.addEventListener("click", function() { setLanguage("ku"); });
     setLanguage(currentLang);
 
-    // ─── Category colors ─────────────────────────────────────────
-    const categoryColors = {
-      conflict: "var(--category-conflict)",
-      politics: "var(--category-politics)",
-      "human rights": "var(--category-human-rights)",
-      "human-rights": "var(--category-human-rights)",
-      economy: "var(--category-economy)",
-      health: "var(--category-health)",
-      migration: "var(--category-migration)",
-      climate: "var(--category-climate)",
-      technology: "var(--category-technology)",
-      culture: "var(--category-culture)",
-      world: "var(--category-world)"
+    var categoryColors = {
+      conflict: "var(--cat-conflict)", politics: "var(--cat-politics)",
+      "human rights": "var(--cat-human-rights)", "human-rights": "var(--cat-human-rights)",
+      economy: "var(--cat-economy)", health: "var(--cat-health)",
+      migration: "var(--cat-migration)", climate: "var(--cat-climate)",
+      technology: "var(--cat-technology)", culture: "var(--cat-culture)",
+      world: "var(--cat-world)"
     };
 
     function getCategoryColor(cat) {
       if (!cat) return "var(--text-muted)";
-      return categoryColors[cat.toLowerCase()] || "var(--category-world)";
-    }
-
-    // ─── Time formatting ─────────────────────────────────────────
-    function timeAgo(dateStr) {
-      if (!dateStr) return "";
-      const now = new Date();
-      const then = new Date(dateStr);
-      const diff = Math.floor((now - then) / 1000);
-      if (diff < 60) return "just now";
-      if (diff < 3600) return Math.floor(diff / 60) + " min ago";
-      if (diff < 86400) return Math.floor(diff / 3600) + " hours ago";
-      if (diff < 172800) return "yesterday";
-      return Math.floor(diff / 86400) + " days ago";
-    }
-
-    // ─── Rendering ───────────────────────────────────────────────
-    function renderBriefing(data) {
-      const stories = data.stories || data.briefing || [];
-      if (!stories.length) {
-        mainContent.innerHTML = '<div class="state-container"><p>No stories available right now. Check back soon.</p></div>';
-        return;
-      }
-      let html = "";
-      stories.forEach((story, i) => {
-        const rank = String(i + 1).padStart(2, "0");
-        const category = story.category || "world";
-        const headline = story.headline;
-        const summary = currentLang === "ku" ? (story.summary_ku || story.summary_en) : story.summary_en;
-        const source = story.primary_source ? story.primary_source.name : "";
-        const sourceUrl = story.primary_source ? story.primary_source.url : "#";
-        const time = timeAgo(story.published_at);
-        const supportingSources = (story.supporting_sources || []).map(s => s.name).filter(Boolean);
-
-        html += '<article class="story">';
-        html += '<div class="story-meta">';
-        html += '<span class="story-rank">' + rank + '</span>';
-        html += '<span class="story-category" style="color:' + getCategoryColor(category) + '">' + category + '</span>';
-        html += '</div>';
-        html += '<h2 class="story-headline">' + escapeHtml(headline) + '</h2>';
-        html += '<p class="story-summary">' + escapeHtml(summary) + '</p>';
-        html += '<div class="story-footer">';
-        if (source) html += '<span class="story-source">Source: ' + escapeHtml(source) + '</span>';
-        if (supportingSources.length) {
-          html += '<span>Also: ' + supportingSources.map(s => escapeHtml(s)).join(", ") + '</span>';
-        }
-        if (sourceUrl && sourceUrl !== "#") {
-          const linkLabel = source ? "Read original reporting at " + escapeHtml(source) : "Read original";
-          html += '<a class="story-link" href="' + escapeHtml(sourceUrl) + '" target="_blank" rel="noopener">' + linkLabel + ' →</a>';
-        }
-        if (time) html += '<span class="story-time">' + time + '</span>';
-        html += '</div>';
-        html += '</article>';
-      });
-      mainContent.innerHTML = html;
+      return categoryColors[cat.toLowerCase()] || "var(--cat-world)";
     }
 
     function escapeHtml(str) {
@@ -398,46 +259,70 @@
       return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     }
 
-    // ─── States ──────────────────────────────────────────────────
+    function timeAgo(dateStr) {
+      if (!dateStr) return "";
+      var now = new Date(), then = new Date(dateStr);
+      var diff = Math.floor((now - then) / 1000);
+      if (diff < 60) return "just now";
+      if (diff < 3600) return Math.floor(diff / 60) + " min ago";
+      if (diff < 86400) return Math.floor(diff / 3600) + " hours ago";
+      if (diff < 172800) return "yesterday";
+      return Math.floor(diff / 86400) + " days ago";
+    }
+
+    function renderBriefing(data) {
+      var stories = data.stories || data.briefing || [];
+      if (!stories.length) {
+        storiesContainer.innerHTML = '<div class="state-container"><p>No stories available right now.</p></div>';
+        return;
+      }
+      var html = "";
+      stories.forEach(function(story, i) {
+        var rank = String(i + 1).padStart(2, "0");
+        var category = story.category || "world";
+        var headline = story.headline || "";
+        var summary = currentLang === "ku" ? (story.summary_ku || story.summary_en) : story.summary_en;
+        var source = story.primary_source ? story.primary_source.name : "";
+        var sourceUrl = story.primary_source ? story.primary_source.url : "";
+        var time = timeAgo(story.published_at);
+        var supporting = (story.supporting_sources || []).map(function(s) { return s.name; }).filter(Boolean);
+
+        html += '<article class="story">';
+        html += '<div class="story-rank">' + rank + '</div>';
+        html += '<span class="story-category" style="color:' + getCategoryColor(category) + '">' + escapeHtml(category) + '</span>';
+        html += '<h3 class="story-headline">' + escapeHtml(headline) + '</h3>';
+        html += '<p class="story-summary">' + escapeHtml(summary) + '</p>';
+        html += '<div class="story-footer">';
+        if (source) html += '<span class="story-source">Source: ' + escapeHtml(source) + '</span>';
+        if (supporting.length) html += '<span>Also covered by: ' + supporting.map(function(s) { return escapeHtml(s); }).join(", ") + '</span>';
+        if (sourceUrl) html += '<a class="story-link" href="' + escapeHtml(sourceUrl) + '" target="_blank" rel="noopener noreferrer">Read original →</a>';
+        if (time) html += '<span class="story-time">' + time + '</span>';
+        html += '</div></article>';
+      });
+      storiesContainer.innerHTML = html;
+    }
+
     function showLoading() {
-      mainContent.innerHTML = '<div class="state-container"><p class="loading-dots">Preparing today\'s briefing</p></div>';
+      storiesContainer.innerHTML = '<div class="state-container"><p class="loading-dots">Preparing today\'s briefing</p></div>';
     }
 
     function showError() {
-      mainContent.innerHTML = '<div class="state-container"><p>Today\'s briefing is temporarily unavailable.</p><button class="retry-btn" onclick="loadBriefing()">Retry</button></div>';
+      storiesContainer.innerHTML = '<div class="state-container"><p>Today\'s briefing is temporarily unavailable.</p><button class="retry-btn" onclick="loadBriefing()">Retry</button></div>';
     }
 
-    // ─── API ─────────────────────────────────────────────────────
     async function loadBriefing() {
-      if (!API_URL && !FALLBACK_API_URL) {
-        showError();
-        return;
-      }
       showLoading();
       try {
-        const url = API_URL || FALLBACK_API_URL;
-        const res = await fetch(url + "/news/today");
+        var res = await fetch(API_URL + "/news/today");
         if (!res.ok) throw new Error(res.status);
-        const data = await res.json();
+        var data = await res.json();
         briefingData = data;
         renderBriefing(data);
       } catch (err) {
-        // Try fallback if primary fails
-        if (API_URL && FALLBACK_API_URL && API_URL !== FALLBACK_API_URL) {
-          try {
-            const res = await fetch(FALLBACK_API_URL + "/news/today");
-            if (!res.ok) throw new Error(res.status);
-            const data = await res.json();
-            briefingData = data;
-            renderBriefing(data);
-            return;
-          } catch (e) { /* fall through to error */ }
-        }
         showError();
       }
     }
 
-    // ─── Init ────────────────────────────────────────────────────
     loadBriefing();
   </script>
 </body>
