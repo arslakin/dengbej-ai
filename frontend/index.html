@@ -26,7 +26,6 @@
       line-height: 1.7; -webkit-font-smoothing: antialiased;
     }
     .container { max-width: 700px; margin: 0 auto; padding: 0 1.25rem; }
-    /* Header */
     header { padding: 1.5rem 0 1.25rem; border-bottom: 1px solid var(--border); }
     .header-inner { display: flex; justify-content: space-between; align-items: center; }
     .wordmark {
@@ -43,7 +42,6 @@
     .lang-toggle button:hover { background: var(--accent-light); }
     .lang-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
     .lang-toggle button[aria-pressed="true"] { background: var(--accent); color: #fff; }
-    /* Section Intro */
     .section-intro { padding: 2rem 0 1.5rem; }
     .section-intro h2 {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -55,38 +53,37 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;
     }
-    /* Listen Area */
     .listen-area { background: var(--bg-listen); border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; }
-    .listen-inner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-    .listen-play { font-size: 1.5rem; color: var(--accent); line-height: 1; flex-shrink: 0; margin-top: 0.1rem; }
-    .listen-text h3 {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem;
+    .ci-bejim {
+      font-family: Georgia, serif; font-size: 1.2rem; font-weight: 700;
+      color: var(--text-primary); margin-bottom: 1rem;
     }
-    .listen-text .listen-meta {
+    .program-choices { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; }
+    .program-btn {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.4rem;
+      font-size: 0.8rem; padding: 0.45rem 0.9rem;
+      border: 1.5px solid var(--border); border-radius: 20px;
+      background: transparent; color: var(--text-secondary); cursor: pointer;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
     }
-    .listen-text .listen-note, .listen-area > .listen-note {
+    .program-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .program-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .program-btn[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .program-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .beje-row { display: flex; align-items: center; gap: 1rem; }
+    .audio-status {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.75rem; color: var(--text-muted);
-    }
-    .listen-question {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;
-      letter-spacing: 0.1em; margin-bottom: 0.2rem;
     }
     .beje-btn {
       font-family: Georgia, serif; font-size: 1.1rem; font-weight: 700;
       padding: 0.6rem 1.4rem; background: var(--accent); color: #fff;
       border: none; border-radius: 6px; cursor: pointer;
-      transition: background 0.15s ease, opacity 0.15s ease;
-      flex-shrink: 0;
+      transition: background 0.15s ease, opacity 0.15s ease; flex-shrink: 0;
     }
     .beje-btn:hover:not(:disabled) { background: var(--accent-hover); }
     .beje-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .beje-btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
-    /* Stories */
     .story { border-bottom: 1px solid var(--border); padding: 1.75rem 0; }
     .story:last-child { border-bottom: none; }
     .story-rank {
@@ -106,12 +103,9 @@
       display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 1rem;
     }
     .story-source { font-weight: 500; color: var(--text-secondary); }
-    .story-link {
-      color: var(--link); text-decoration: none; font-weight: 500; margin-left: auto;
-    }
+    .story-link { color: var(--link); text-decoration: none; font-weight: 500; margin-left: auto; }
     .story-link:hover { color: var(--link-hover); text-decoration: underline; }
     .story-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    /* States */
     .state-container { text-align: center; padding: 4rem 1rem; }
     .state-container p {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -127,7 +121,6 @@
     }
     .retry-btn:hover { background: var(--accent-hover); }
     .retry-btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
-    /* About & CTA */
     .about-section { border-top: 1px solid var(--border); padding: 2.5rem 0 2rem; }
     .about-section h2 {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -143,26 +136,24 @@
     .cta-section a { color: var(--link); text-decoration: none; font-weight: 500; }
     .cta-section a:hover { color: var(--link-hover); text-decoration: underline; }
     .cta-section a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    /* Footer */
     footer {
       border-top: 1px solid var(--border); padding: 1.75rem 0 3rem;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.75rem; color: var(--text-muted); text-align: center; line-height: 1.8;
     }
-    /* Responsive */
     @media (max-width: 599px) {
       .story-headline { font-size: 1.35rem; }
       .story-rank { font-size: 1.4rem; }
       .listen-area { padding: 1.25rem; }
       .story-link { margin-left: 0; }
+      .ci-bejim { font-size: 1.1rem; }
+      .program-choices { gap: 0.4rem; }
+      .program-btn { font-size: 0.75rem; padding: 0.4rem 0.75rem; }
+      .beje-row { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+      .beje-btn { width: 100%; }
     }
-    @media (min-width: 600px) and (max-width: 899px) {
-      .container { padding: 0 2rem; }
-    }
-    @media (min-width: 900px) {
-      .story-headline { font-size: 1.6rem; }
-      header { padding: 2rem 0 1.5rem; }
-    }
+    @media (min-width: 600px) and (max-width: 899px) { .container { padding: 0 2rem; } }
+    @media (min-width: 900px) { .story-headline { font-size: 1.6rem; } header { padding: 2rem 0 1.5rem; } }
     @media (prefers-reduced-motion: reduce) {
       .loading-dots::after { animation: none; content: '...'; }
       * { transition: none !important; }
@@ -184,23 +175,18 @@
 
   <main class="container" id="main-content" aria-live="polite">
     <section class="section-intro">
-      <h2>Today's Dengbej</h2>
-      <p>The five stories you should know today.</p>
+      <h2 id="section-title">Today's Dengbej</h2>
+      <p id="section-desc">The five stories you should know today.</p>
       <p class="date" id="currentDate"></p>
     </section>
 
-    <section class="listen-area" aria-label="Audio briefing" data-audio-url="">
-      <div class="listen-inner">
-        <div class="listen-text">
-          <p class="listen-question">Çi bêjim?</p>
-          <h3>Nûçeyên îro</h3>
-          <p class="listen-meta">5 stories · <span id="listenDate"></span></p>
-        </div>
-        <button class="beje-btn" id="beje-btn" disabled aria-label="Play daily briefing (coming soon)">
-          Bêje!
-        </button>
+    <section class="listen-area" aria-label="Program selection">
+      <p class="ci-bejim" id="ci-bejim-label">Çi bêjim?</p>
+      <div class="program-choices" role="radiogroup" aria-labelledby="ci-bejim-label"></div>
+      <div class="beje-row">
+        <button class="beje-btn" id="beje-btn" disabled aria-label="Play daily briefing">Bêje!</button>
+        <p class="audio-status" id="audio-status">Tê amadekirin</p>
       </div>
-      <p class="listen-note" id="audio-status">Dengê Kurdî — tê amadekirin</p>
     </section>
 
     <div id="stories-container">
@@ -231,32 +217,25 @@
     var currentLang = sessionStorage.getItem("dengbej-lang") || "en";
     var briefingData = null;
 
+    var PROGRAMS = [
+      { id: "today", label_ku: "Nûçeyên Îro", label_en: "Today's News", available: true },
+      { id: "kurdistan", label_ku: "Behsa Kurdistanê bike", label_en: "About Kurdistan", available: false },
+      { id: "world", label_ku: "Behsa dinyayê bike", label_en: "World News", available: false },
+      { id: "middle-east", label_ku: "Behsa Rojhilata Navîn bike", label_en: "Middle East", available: false },
+      { id: "turkey", label_ku: "Behsa Tirkiyeyê bike", label_en: "About Turkey", available: false },
+      { id: "bakur", label_ku: "Behsa Bakur bike", label_en: "Northern Kurdistan", available: false }
+    ];
+    var selectedProgram = "today";
+
     var storiesContainer = document.getElementById("stories-container");
     var btnEn = document.getElementById("btn-en");
     var btnKu = document.getElementById("btn-ku");
     var dateEl = document.getElementById("currentDate");
-    var listenDateEl = document.getElementById("listenDate");
 
     var todayFormatted = new Date().toLocaleDateString("en-US", {
       weekday: "long", year: "numeric", month: "long", day: "numeric"
     });
     dateEl.textContent = todayFormatted;
-    listenDateEl.textContent = new Date().toLocaleDateString("en-US", {
-      month: "long", day: "numeric", year: "numeric"
-    });
-
-    function setLanguage(lang) {
-      currentLang = lang;
-      sessionStorage.setItem("dengbej-lang", lang);
-      btnEn.setAttribute("aria-pressed", lang === "en");
-      btnKu.setAttribute("aria-pressed", lang === "ku");
-      document.documentElement.lang = lang === "ku" ? "ku" : "en";
-      if (briefingData) renderBriefing(briefingData);
-    }
-
-    btnEn.addEventListener("click", function() { setLanguage("en"); });
-    btnKu.addEventListener("click", function() { setLanguage("ku"); });
-    setLanguage(currentLang);
 
     var categoryColors = {
       conflict: "var(--cat-conflict)", politics: "var(--cat-politics)",
@@ -288,6 +267,74 @@
       return Math.floor(diff / 86400) + " days ago";
     }
 
+    function renderPrograms() {
+      var container = document.querySelector(".program-choices");
+      var html = "";
+      PROGRAMS.forEach(function(prog) {
+        var label = currentLang === "ku" ? prog.label_ku : prog.label_en;
+        var selected = prog.id === selectedProgram;
+        html += '<button type="button" class="program-btn" role="radio" '
+          + 'aria-checked="' + selected + '" '
+          + 'data-program="' + prog.id + '" '
+          + ((!prog.available && prog.id !== "today") ? 'disabled ' : '')
+          + '>' + escapeHtml(label) + '</button>';
+      });
+      container.innerHTML = html;
+      container.querySelectorAll(".program-btn").forEach(function(btn) {
+        btn.addEventListener("click", function() {
+          if (btn.disabled) return;
+          selectedProgram = btn.getAttribute("data-program");
+          renderPrograms();
+          updateBejeState();
+        });
+      });
+    }
+
+    function updateBejeState() {
+      var bejeBtn = document.getElementById("beje-btn");
+      var statusEl = document.getElementById("audio-status");
+      if (selectedProgram === "today") {
+        if (briefingData && briefingData.daily_audio) {
+          if (briefingData.daily_audio.available && briefingData.daily_audio.url) {
+            bejeBtn.disabled = false;
+            bejeBtn.setAttribute("aria-label", currentLang === "ku" ? "Nûçeyên îro bibihîze" : "Listen to today's news");
+            statusEl.textContent = currentLang === "ku" ? "Dengê Kurdî amade ye" : "Kurdish audio ready";
+          } else if (briefingData.daily_audio.script_available) {
+            bejeBtn.disabled = true;
+            bejeBtn.setAttribute("aria-label", currentLang === "ku" ? "Deng tê amadekirin" : "Audio being prepared");
+            statusEl.textContent = currentLang === "ku" ? "Skrîpta amade ye — deng tê amadekirin" : "Script ready — audio coming soon";
+          } else {
+            bejeBtn.disabled = true;
+            statusEl.textContent = currentLang === "ku" ? "Tê amadekirin" : "Being prepared";
+          }
+        } else {
+          bejeBtn.disabled = true;
+          statusEl.textContent = currentLang === "ku" ? "Tê amadekirin" : "Being prepared";
+        }
+      } else {
+        bejeBtn.disabled = true;
+        bejeBtn.setAttribute("aria-label", currentLang === "ku" ? "Bernameya " + selectedProgram + " — tê amadekirin" : "Program coming soon");
+        statusEl.textContent = currentLang === "ku" ? "Ev bernameyê tê amadekirin" : "This program is coming soon";
+      }
+    }
+
+    function setLanguage(lang) {
+      currentLang = lang;
+      sessionStorage.setItem("dengbej-lang", lang);
+      btnEn.setAttribute("aria-pressed", lang === "en");
+      btnKu.setAttribute("aria-pressed", lang === "ku");
+      document.documentElement.lang = lang === "ku" ? "ku" : "en";
+      document.getElementById("ci-bejim-label").textContent = lang === "ku" ? "Çi bêjim?" : "What should I tell you?";
+      document.getElementById("section-title").textContent = lang === "ku" ? "Nûçeyên Dengbej" : "Today's Dengbej";
+      document.getElementById("section-desc").textContent = lang === "ku" ? "Pênc nûçeyên ku divê îro bizanin." : "The five stories you should know today.";
+      renderPrograms();
+      updateBejeState();
+      if (briefingData) renderBriefing(briefingData);
+    }
+
+    btnEn.addEventListener("click", function() { setLanguage("en"); });
+    btnKu.addEventListener("click", function() { setLanguage("ku"); });
+
     function renderBriefing(data) {
       var stories = data.stories || data.briefing || [];
       if (!stories.length) {
@@ -304,7 +351,6 @@
         var sourceUrl = story.primary_source ? story.primary_source.url : "";
         var time = timeAgo(story.published_at);
         var supporting = (story.supporting_sources || []).map(function(s) { return s.name; }).filter(Boolean);
-
         html += '<article class="story">';
         html += '<div class="story-rank">' + rank + '</div>';
         html += '<span class="story-category" style="color:' + getCategoryColor(category) + '">' + escapeHtml(category) + '</span>';
@@ -336,21 +382,13 @@
         var data = await res.json();
         briefingData = data;
         renderBriefing(data);
-        // Update audio status
-        if (data.daily_audio && data.daily_audio.available && data.daily_audio.url) {
-          document.getElementById("beje-btn").disabled = false;
-          document.getElementById("beje-btn").setAttribute("aria-label", "Play daily Kurdish briefing");
-          document.getElementById("audio-status").textContent = "Dengê Kurdî amade ye";
-          // Store URL for future playback
-          document.querySelector(".listen-area").setAttribute("data-audio-url", data.daily_audio.url);
-        } else if (data.daily_audio && data.daily_audio.script_available) {
-          document.getElementById("audio-status").textContent = "Skrîpta amade ye — deng tê amadekirin";
-        }
+        updateBejeState();
       } catch (err) {
         showError();
       }
     }
 
+    setLanguage(currentLang);
     loadBriefing();
   </script>
 </body>
