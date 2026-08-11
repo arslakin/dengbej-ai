@@ -18,9 +18,11 @@ import boto3
 from botocore.exceptions import ClientError
 
 BRIEFINGS_TABLE = os.environ.get("BRIEFINGS_TABLE", "dengbej-briefings")
+PROGRAMS_TABLE = os.environ.get("PROGRAMS_TABLE", "dengbej-programs")
 
 dynamodb = boto3.resource("dynamodb")
 briefings_table = dynamodb.Table(BRIEFINGS_TABLE)
+programs_table_resource = dynamodb.Table(PROGRAMS_TABLE)
 
 
 class DecimalEncoder(json.JSONEncoder):
@@ -45,6 +47,11 @@ def lambda_handler(event, context):
     # Routing
     if path == "/news/today":
         return handle_today()
+
+    # Match /news/program/{id}
+    program_match = re.match(r'^/news/program/([a-z0-9-]+)$', path)
+    if program_match:
+        return handle_program(program_match.group(1))
 
     # Match /news/YYYY-MM-DD
     date_match = re.match(r'^/news/(\d{4}-\d{2}-\d{2})$', path)
@@ -77,6 +84,60 @@ def handle_date(date_str):
     if not briefing:
         return cors_response(404, {"error": "No briefing available", "date": date_str})
     return cors_response(200, format_briefing(briefing))
+
+
+def handle_program(program_id):
+    """Return latest program briefing."""
+    from datetime import timedelta
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Try today, then yesterday
+    for date in [today, (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")]:
+        try:
+            response = programs_table_resource.get_item(
+                Key={"program_id": program_id, "briefing_date": date}
+            )
+            item = response.get("Item")
+            if item and item.get("story_count", 0) > 0:
+                return cors_response(200, format_program(item))
+        except ClientError:
+            pass
+
+    # Return empty program
+    return cors_response(200, {
+        "program_id": program_id,
+        "label_ku": "",
+        "label_en": "",
+        "generated_at": None,
+        "story_count": 0,
+        "stories": [],
+        "message": "No stories available for this program right now."
+    })
+
+
+def format_program(item):
+    """Format program briefing for API response."""
+    stories = item.get("stories", [])
+    formatted = []
+    for i, story in enumerate(stories):
+        formatted.append({
+            "rank": i + 1,
+            "headline": story.get("headline"),
+            "category": story.get("category"),
+            "primary_source": {"name": story.get("primary_source", ""), "url": story.get("original_url", "")},
+            "supporting_sources": [{"name": s.get("source_name", ""), "url": s.get("url", "")} for s in story.get("supporting_sources", [])],
+            "published_at": story.get("pub_date"),
+            "feed_description": story.get("feed_description"),
+        })
+
+    return {
+        "program_id": item.get("program_id"),
+        "label_ku": item.get("label_ku", ""),
+        "label_en": item.get("label_en", ""),
+        "generated_at": item.get("generated_at"),
+        "story_count": len(formatted),
+        "stories": formatted,
+    }
 
 
 def get_processed_briefing(date_str):

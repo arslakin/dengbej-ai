@@ -102,3 +102,14 @@ output "daily_audio_function_name" {
   description = "Daily audio script generator Lambda"
   value       = aws_lambda_function.daily_audio.function_name
 }
+
+# ─── Program Generator Outputs ────────────────────────────────────────────────
+
+output "programs_table_name" {
+  description = "DynamoDB programs table"
+  value       = aws_dynamodb_table.programs.name
+}
+output "program_generator_function_name" {
+  description = "Program generator Lambda"
+  value       = aws_lambda_function.program_generator.function_name
+}

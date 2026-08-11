@@ -85,3 +85,17 @@ variable "daily_audio_function_name" {
   type        = string
   default     = "dengbej-ai-daily-audio"
 }
+
+# ─── Program Generator Pipeline ──────────────────────────────────────────────
+
+variable "programs_table_name" {
+  description = "DynamoDB table for program briefings"
+  type        = string
+  default     = "dengbej-programs"
+}
+
+variable "program_generator_function_name" {
+  description = "Lambda function name for program generator"
+  type        = string
+  default     = "dengbej-ai-program-generator"
+}

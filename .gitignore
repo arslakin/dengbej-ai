@@ -113,3 +113,5 @@ terraform.tfvars
 infrastructure/news_api.zip
 
 infrastructure/daily_audio.zip
+
+infrastructure/program_generator.zip

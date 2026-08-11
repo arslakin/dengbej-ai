@@ -279,7 +279,6 @@
         html += '<button type="button" class="program-btn" role="radio" '
           + 'aria-checked="' + selected + '" '
           + 'data-program="' + prog.id + '" '
-          + ((!prog.available && prog.id !== "today") ? 'disabled ' : '')
           + '>' + escapeHtml(label) + '</button>';
       });
       container.innerHTML = html;
@@ -289,6 +288,12 @@
           selectedProgram = btn.getAttribute("data-program");
           renderPrograms();
           updateBejeState();
+          if (selectedProgram === "today") {
+            if (briefingData) renderBriefing(briefingData);
+            else loadBriefing();
+          } else {
+            loadProgram(selectedProgram);
+          }
         });
       });
     }
@@ -389,6 +394,54 @@
       } catch (err) {
         showError();
       }
+    }
+
+    async function loadProgram(programId) {
+      showLoading();
+      try {
+        var res = await fetch(API_URL + "/news/program/" + programId);
+        if (!res.ok) throw new Error(res.status);
+        var data = await res.json();
+        if (data.stories && data.stories.length > 0) {
+          renderProgramStories(data);
+        } else {
+          storiesContainer.innerHTML = '<div class="state-container"><p>' +
+            (currentLang === "ku" ? "Niha nûçeyên vê bernameyê nîn in." : "No stories available for this program right now.") +
+            '</p></div>';
+        }
+      } catch (err) {
+        storiesContainer.innerHTML = '<div class="state-container"><p>' +
+          (currentLang === "ku" ? "Nebû ku bernameyê bar bikin." : "Could not load this program.") +
+          '</p></div>';
+      }
+    }
+
+    function renderProgramStories(data) {
+      // Reuse same rendering as Today's 5
+      var stories = data.stories || [];
+      var html = "";
+      stories.forEach(function(story, i) {
+        var rank = String(i + 1).padStart(2, "0");
+        var category = story.category || data.program_id || "world";
+        var headline = story.headline || "";
+        var summary = story.feed_description || "";
+        var source = story.primary_source ? story.primary_source.name : "";
+        var sourceUrl = story.primary_source ? story.primary_source.url : "";
+        var time = timeAgo(story.published_at);
+        var supporting = (story.supporting_sources || []).map(function(s) { return s.name; }).filter(Boolean);
+        html += '<article class="story">';
+        html += '<div class="story-rank">' + rank + '</div>';
+        html += '<span class="story-category" style="color:' + getCategoryColor(category) + '">' + escapeHtml(category) + '</span>';
+        html += '<h3 class="story-headline">' + escapeHtml(headline) + '</h3>';
+        if (summary) html += '<p class="story-summary">' + escapeHtml(summary) + '</p>';
+        html += '<div class="story-footer">';
+        if (source) html += '<span class="story-source">Source: ' + escapeHtml(source) + '</span>';
+        if (supporting.length) html += '<span>Also: ' + supporting.map(function(s) { return escapeHtml(s); }).join(", ") + '</span>';
+        if (sourceUrl) html += '<a class="story-link" href="' + escapeHtml(sourceUrl) + '" target="_blank" rel="noopener noreferrer">Read original →</a>';
+        if (time) html += '<span class="story-time">' + time + '</span>';
+        html += '</div></article>';
+      });
+      storiesContainer.innerHTML = html;
     }
 
     setLanguage(currentLang);

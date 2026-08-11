@@ -49,7 +49,9 @@ resource "aws_iam_role_policy" "news_api_policy" {
         ]
         Resource = [
           aws_dynamodb_table.briefings.arn,
-          "${aws_dynamodb_table.briefings.arn}/index/*"
+          "${aws_dynamodb_table.briefings.arn}/index/*",
+          aws_dynamodb_table.programs.arn,
+          "${aws_dynamodb_table.programs.arn}/index/*"
         ]
       }
     ]
@@ -84,6 +86,7 @@ resource "aws_lambda_function" "news_api" {
   environment {
     variables = {
       BRIEFINGS_TABLE = aws_dynamodb_table.briefings.name
+      PROGRAMS_TABLE  = aws_dynamodb_table.programs.name
     }
   }
 
