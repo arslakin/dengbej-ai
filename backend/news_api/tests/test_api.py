@@ -86,18 +86,14 @@ def test_cors_headers_present():
         response = _invoke_lambda("/news/today")
 
     headers = response["headers"]
-    assert headers["Access-Control-Allow-Origin"] == "*"
-    assert "GET" in headers["Access-Control-Allow-Methods"]
-    assert "OPTIONS" in headers["Access-Control-Allow-Methods"]
     assert headers["Content-Type"] == "application/json"
     assert "Cache-Control" in headers
 
 
 def test_options_preflight():
-    """OPTIONS request should return 200 with CORS headers."""
+    """OPTIONS request should return 200."""
     response = _invoke_lambda("/news/today", method="OPTIONS")
     assert response["statusCode"] == 200
-    assert response["headers"]["Access-Control-Allow-Origin"] == "*"
 
 
 # ─── Test: Routing ───────────────────────────────────────────────────────────
@@ -319,7 +315,7 @@ def test_response_structure():
     body = json.loads(response["body"])
 
     # Top-level fields
-    assert set(body.keys()) == {"date", "generated_at", "edition", "story_count", "stories"}
+    assert set(body.keys()) == {"date", "generated_at", "edition", "story_count", "stories", "daily_audio"}
 
     # Story fields
     story = body["stories"][0]

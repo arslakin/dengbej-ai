@@ -138,12 +138,27 @@ def format_briefing(briefing):
             "processed_at": story.get("processed_at"),
         })
 
+    # Daily audio metadata
+    daily_audio_meta = briefing.get("daily_audio_meta", {})
+    script_exists = bool(briefing.get("daily_audio_script_ku"))
+    audio_url = daily_audio_meta.get("audio_url") if daily_audio_meta else None
+
+    daily_audio = {
+        "available": bool(audio_url),
+        "script_available": script_exists,
+        "language": "ku",
+        "url": audio_url,
+        "duration_seconds": daily_audio_meta.get("audio_duration_seconds") if daily_audio_meta else None,
+        "generated_at": daily_audio_meta.get("script_generated_at") if daily_audio_meta else None,
+    }
+
     return {
         "date": briefing.get("briefing_date"),
         "generated_at": briefing.get("generated_at"),
         "edition": "today",
         "story_count": len(formatted_stories),
         "stories": formatted_stories,
+        "daily_audio": daily_audio,
     }
 
 

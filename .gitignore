@@ -111,3 +111,5 @@ terraform.tfvars
 *.so
 
 infrastructure/news_api.zip
+
+infrastructure/daily_audio.zip

@@ -77,3 +77,11 @@ variable "news_api_function_name" {
   type        = string
   default     = "dengbej-ai-news-api"
 }
+
+# ─── Daily Audio Script Generator ────────────────────────────────────────────
+
+variable "daily_audio_function_name" {
+  description = "Lambda function name for daily audio script generator"
+  type        = string
+  default     = "dengbej-ai-daily-audio"
+}

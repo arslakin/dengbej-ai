@@ -57,7 +57,7 @@
     }
     /* Listen Area */
     .listen-area { background: var(--bg-listen); border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; }
-    .listen-inner { display: flex; align-items: flex-start; gap: 1rem; }
+    .listen-inner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
     .listen-play { font-size: 1.5rem; color: var(--accent); line-height: 1; flex-shrink: 0; margin-top: 0.1rem; }
     .listen-text h3 {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -67,10 +67,25 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.4rem;
     }
-    .listen-text .listen-note {
+    .listen-text .listen-note, .listen-area > .listen-note {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.75rem; color: var(--text-muted);
     }
+    .listen-question {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 0.1em; margin-bottom: 0.2rem;
+    }
+    .beje-btn {
+      font-family: Georgia, serif; font-size: 1.1rem; font-weight: 700;
+      padding: 0.6rem 1.4rem; background: var(--accent); color: #fff;
+      border: none; border-radius: 6px; cursor: pointer;
+      transition: background 0.15s ease, opacity 0.15s ease;
+      flex-shrink: 0;
+    }
+    .beje-btn:hover:not(:disabled) { background: var(--accent-hover); }
+    .beje-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .beje-btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
     /* Stories */
     .story { border-bottom: 1px solid var(--border); padding: 1.75rem 0; }
     .story:last-child { border-bottom: none; }
@@ -176,13 +191,16 @@
 
     <section class="listen-area" aria-label="Audio briefing" data-audio-url="">
       <div class="listen-inner">
-        <span class="listen-play" aria-hidden="true">▶</span>
         <div class="listen-text">
-          <h3>Listen to Today's Dengbej</h3>
+          <p class="listen-question">Çi bêjim?</p>
+          <h3>Nûçeyên îro</h3>
           <p class="listen-meta">5 stories · <span id="listenDate"></span></p>
-          <p class="listen-note">Audio briefing coming soon</p>
         </div>
+        <button class="beje-btn" id="beje-btn" disabled aria-label="Play daily briefing (coming soon)">
+          Bêje!
+        </button>
       </div>
+      <p class="listen-note" id="audio-status">Dengê Kurdî — tê amadekirin</p>
     </section>
 
     <div id="stories-container">
@@ -318,6 +336,16 @@
         var data = await res.json();
         briefingData = data;
         renderBriefing(data);
+        // Update audio status
+        if (data.daily_audio && data.daily_audio.available && data.daily_audio.url) {
+          document.getElementById("beje-btn").disabled = false;
+          document.getElementById("beje-btn").setAttribute("aria-label", "Play daily Kurdish briefing");
+          document.getElementById("audio-status").textContent = "Dengê Kurdî amade ye";
+          // Store URL for future playback
+          document.querySelector(".listen-area").setAttribute("data-audio-url", data.daily_audio.url);
+        } else if (data.daily_audio && data.daily_audio.script_available) {
+          document.getElementById("audio-status").textContent = "Skrîpta amade ye — deng tê amadekirin";
+        }
       } catch (err) {
         showError();
       }

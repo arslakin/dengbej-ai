@@ -95,3 +95,10 @@ output "news_api_function_url" {
   description = "News API public URL"
   value       = aws_lambda_function_url.news_api.function_url
 }
+
+# ─── Daily Audio Script Generator Outputs ─────────────────────────────────────
+
+output "daily_audio_function_name" {
+  description = "Daily audio script generator Lambda"
+  value       = aws_lambda_function.daily_audio.function_name
+}
