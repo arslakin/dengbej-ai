@@ -29,11 +29,13 @@ from botocore.exceptions import ClientError
 
 # Configuration
 BRIEFINGS_TABLE = os.environ.get("BRIEFINGS_TABLE", "dengbej-briefings")
+PROGRAMS_TABLE = os.environ.get("PROGRAMS_TABLE", "dengbej-programs")
 MODEL_ID = os.environ.get("MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
 
 # AWS Clients
 dynamodb = boto3.resource("dynamodb")
 briefings_table = dynamodb.Table(BRIEFINGS_TABLE)
+programs_table = dynamodb.Table(PROGRAMS_TABLE)
 bedrock_runtime = boto3.client("bedrock-runtime")
 
 
@@ -60,15 +62,23 @@ class Telemetry:
 
 
 def lambda_handler(event, context):
-    """Generate daily Kurdish broadcast script from Today's 5."""
+    """Generate Kurdish broadcast script from Today's 5 or a specific program."""
     telemetry = Telemetry()
 
     target_date = event.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     force = event.get("force", False)
+    program_id = event.get("program_id")  # None = Today's 5, otherwise topic program
 
+    if program_id and program_id != "today":
+        return handle_program_script(program_id, target_date, force, telemetry)
+    else:
+        return handle_today_script(target_date, force, telemetry)
+
+
+def handle_today_script(target_date, force, telemetry):
+    """Generate script for Today's 5 (original behavior)."""
     print(f"Daily audio script generation for: {target_date} (force={force})")
 
-    # Get the latest processed briefing
     briefing = get_processed_briefing(target_date)
     if not briefing:
         telemetry.finish()
@@ -81,7 +91,6 @@ def lambda_handler(event, context):
         telemetry.finish()
         return {"statusCode": 400, "body": {"error": "Insufficient processed stories (need at least 3)", "telemetry": telemetry.to_dict()}}
 
-    # Idempotency check
     existing_script = briefing.get("daily_audio_script_ku")
     if existing_script and not force:
         print("Script already exists, skipping generation")
@@ -93,15 +102,12 @@ def lambda_handler(event, context):
             "telemetry": telemetry.to_dict(),
         }}
 
-    # Generate the broadcast script
     script = generate_broadcast_script(processed_stories, target_date, telemetry)
     if not script:
         telemetry.finish()
         return {"statusCode": 500, "body": {"error": "Script generation failed", "telemetry": telemetry.to_dict()}}
 
     telemetry.script_chars = len(script)
-
-    # Store script in DynamoDB
     store_script(briefing, script, target_date, telemetry)
 
     telemetry.finish()
@@ -114,6 +120,176 @@ def lambda_handler(event, context):
         "story_count": len(processed_stories),
         "telemetry": telemetry.to_dict(),
     }}
+
+
+VALID_PROGRAM_IDS = {"kurdistan", "world", "middle-east", "turkey", "bakur", "rojava", "basur", "rojhilat"}
+
+
+def handle_program_script(program_id, target_date, force, telemetry):
+    """Generate script for a specific topic program."""
+    print(f"Program script generation: {program_id} for {target_date} (force={force})")
+
+    if program_id not in VALID_PROGRAM_IDS:
+        telemetry.finish()
+        return {"statusCode": 400, "body": {"error": f"Invalid program_id: {program_id}", "telemetry": telemetry.to_dict()}}
+
+    # Get the program briefing from dengbej-programs
+    program = get_program_briefing(program_id, target_date)
+    if not program:
+        telemetry.finish()
+        return {"statusCode": 404, "body": {"error": f"No program briefing for {program_id} on {target_date}", "telemetry": telemetry.to_dict()}}
+
+    stories = program.get("stories", [])
+    if not stories:
+        telemetry.finish()
+        return {"statusCode": 200, "body": {
+            "status": "empty",
+            "program_id": program_id,
+            "briefing_date": target_date,
+            "message": "No stories in this program — no script generated",
+            "telemetry": telemetry.to_dict(),
+        }}
+
+    # Idempotency: check if script already exists
+    existing_script = program.get("script_ku")
+    if existing_script and not force:
+        print(f"Program script already exists for {program_id}, skipping")
+        telemetry.finish()
+        return {"statusCode": 200, "body": {
+            "status": "already_exists",
+            "program_id": program_id,
+            "briefing_date": target_date,
+            "script_length": len(existing_script),
+            "telemetry": telemetry.to_dict(),
+        }}
+
+    # Generate the script
+    script = generate_program_script(stories, program_id, target_date, telemetry)
+    if not script:
+        telemetry.finish()
+        return {"statusCode": 500, "body": {"error": "Program script generation failed", "telemetry": telemetry.to_dict()}}
+
+    telemetry.script_chars = len(script)
+
+    # Store script back in programs table
+    store_program_script(program_id, target_date, program.get("briefing_date", target_date), script, telemetry)
+
+    telemetry.finish()
+    print(f"Telemetry: {json.dumps(telemetry.to_dict())}")
+
+    return {"statusCode": 200, "body": {
+        "status": "generated",
+        "program_id": program_id,
+        "briefing_date": target_date,
+        "script_length": len(script),
+        "story_count": len(stories),
+        "telemetry": telemetry.to_dict(),
+    }}
+
+
+def get_program_briefing(program_id, date_str):
+    """Get a program briefing from dengbej-programs table."""
+    try:
+        response = programs_table.get_item(
+            Key={"program_id": program_id, "briefing_date": date_str}
+        )
+        return response.get("Item")
+    except ClientError as e:
+        print(f"DynamoDB programs error: {e}")
+        return None
+
+
+def generate_program_script(stories, program_id, date_str, telemetry):
+    """Generate a Kurdish broadcast script for a topic program."""
+    story_blocks = []
+    for i, story in enumerate(stories, 1):
+        block = f"""Story {i}:
+Headline: {story.get('headline', '')}
+Category: {story.get('category', program_id)}
+Description: {story.get('feed_description', '')}
+Source: {story.get('primary_source', '')}"""
+        story_blocks.append(block)
+
+    stories_text = "\n\n".join(story_blocks)
+    story_count = len(stories)
+
+    # Adapt structure based on story count
+    if story_count == 1:
+        structure_instruction = "Tell this single story in detail (5-8 sentences). No transitions needed."
+        target_length = "300-500 words"
+    elif story_count == 2:
+        structure_instruction = "Tell both stories with a brief transition between them."
+        target_length = "400-600 words"
+    else:
+        structure_instruction = f"Tell all {story_count} stories as one coherent program with varied transitions."
+        target_length = "500-900 words"
+
+    prompt = f"""You are composing a Kurmanji Kurdish topic briefing for Dengbej audio service.
+Program: {program_id}
+
+LANGUAGE AND STYLE:
+- Write DIRECTLY in natural, fluent Kurmanji Kurdish
+- Use standard, widely understood Kurmanji vocabulary
+- Write short-to-medium sentences suitable for being read aloud on radio
+- Vary sentence structure — avoid repetition
+- Use natural Kurdish number expressions
+- Keep proper nouns in their recognized form
+- Avoid mixing Turkish or English syntax into Kurdish sentences
+- Do NOT use the characters "ğ" or "ı" — these are Turkish, not Kurmanji
+
+FACTUAL RULES:
+- Use ONLY facts from the supplied stories — do NOT invent anything
+- Preserve exact numbers, casualty figures, percentages, dates, and names
+- Do NOT add analysis, opinion, or interpretation beyond what sources state
+- Do NOT invent quotations
+- Do NOT present Dengbej as a human journalist or eyewitness
+
+STRUCTURE:
+- Opening: "Rojbaş. Ev Dengbej e. {date_str}."
+- {structure_instruction}
+- Closing: "Ev bû Dengbej. Hêvî dikin ku sibê jî li gel we bin."
+
+OUTPUT:
+- Write ONLY the spoken text — no stage directions, no labels, no formatting
+- Target {target_length} of natural spoken Kurmanji
+- The result should sound like a professional Kurdish radio news segment
+
+STORIES:
+
+{stories_text}
+
+KURDISH BROADCAST SCRIPT:"""
+
+    try:
+        result = invoke_bedrock(prompt, max_tokens=2000, telemetry=telemetry)
+        return result.strip() if result else None
+    except Exception as e:
+        print(f"Program script generation failed: {e}")
+        return None
+
+
+def store_program_script(program_id, date_str, briefing_date, script, telemetry):
+    """Store generated script in the programs table."""
+    try:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        programs_table.update_item(
+            Key={"program_id": program_id, "briefing_date": briefing_date},
+            UpdateExpression="SET script_ku = :script, script_meta = :meta",
+            ExpressionAttributeValues={
+                ":script": script,
+                ":meta": {
+                    "script_generated_at": now_iso,
+                    "model_id": MODEL_ID,
+                    "script_chars": len(script),
+                    "bedrock_input_tokens": telemetry.bedrock_input_tokens,
+                    "bedrock_output_tokens": telemetry.bedrock_output_tokens,
+                },
+            },
+        )
+        print(f"Program script stored: {program_id} ({len(script)} chars)")
+    except ClientError as e:
+        print(f"Failed to store program script: {e}")
+        raise
 
 
 def get_processed_briefing(date_str):

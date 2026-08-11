@@ -416,6 +416,114 @@ def test_handler_defaults_to_today(mock_get):
     assert today in result["body"]["error"]
 
 
+# ─── Test: Program Script Generation ─────────────────────────────────────────
+
+@patch("lambda_function.programs_table")
+@patch("lambda_function.invoke_bedrock")
+def test_program_multi_story(mock_bedrock, mock_programs):
+    """A program with multiple stories should generate a script."""
+    mock_bedrock.return_value = "Rojbaş. Ev Dengbej e. Script content."
+    mock_programs.get_item.return_value = {"Item": {
+        "program_id": "bakur", "briefing_date": "2026-08-11",
+        "stories": [
+            {"headline": "PKK story 1", "category": "bakur", "feed_description": "Desc 1", "primary_source": "BBC"},
+            {"headline": "PKK story 2", "category": "bakur", "feed_description": "Desc 2", "primary_source": "DW"},
+        ],
+        "script_ku": None,
+    }}
+    mock_programs.update_item.return_value = {}
+
+    result = lambda_handler({"program_id": "bakur", "date": "2026-08-11"}, None)
+
+    assert result["statusCode"] == 200
+    assert result["body"]["status"] == "generated"
+    assert result["body"]["program_id"] == "bakur"
+    assert result["body"]["story_count"] == 2
+    mock_bedrock.assert_called_once()
+
+
+@patch("lambda_function.programs_table")
+@patch("lambda_function.invoke_bedrock")
+def test_program_single_story(mock_bedrock, mock_programs):
+    """A program with 1 story should still generate a script."""
+    mock_bedrock.return_value = "Rojbaş. Ev Dengbej e. Single story."
+    mock_programs.get_item.return_value = {"Item": {
+        "program_id": "basur", "briefing_date": "2026-08-11",
+        "stories": [
+            {"headline": "Barzani story", "category": "basur", "feed_description": "KRG news", "primary_source": "AJ"},
+        ],
+        "script_ku": None,
+    }}
+    mock_programs.update_item.return_value = {}
+
+    result = lambda_handler({"program_id": "basur", "date": "2026-08-11"}, None)
+
+    assert result["statusCode"] == 200
+    assert result["body"]["status"] == "generated"
+    assert result["body"]["story_count"] == 1
+
+
+@patch("lambda_function.programs_table")
+def test_program_zero_stories_no_bedrock(mock_programs):
+    """A program with 0 stories should NOT call Bedrock."""
+    mock_programs.get_item.return_value = {"Item": {
+        "program_id": "rojava", "briefing_date": "2026-08-11",
+        "stories": [],
+        "script_ku": None,
+    }}
+
+    result = lambda_handler({"program_id": "rojava", "date": "2026-08-11"}, None)
+
+    assert result["statusCode"] == 200
+    assert result["body"]["status"] == "empty"
+    assert result["body"]["telemetry"]["bedrock_calls"] == 0
+
+
+def test_program_invalid_id():
+    """An invalid program_id should return 400."""
+    result = lambda_handler({"program_id": "invalid-xyz", "date": "2026-08-11"}, None)
+    assert result["statusCode"] == 400
+    assert "Invalid" in result["body"]["error"]
+
+
+@patch("lambda_function.programs_table")
+def test_program_idempotency(mock_programs):
+    """Existing script should not be regenerated."""
+    mock_programs.get_item.return_value = {"Item": {
+        "program_id": "bakur", "briefing_date": "2026-08-11",
+        "stories": [{"headline": "Story"}],
+        "script_ku": "Existing script content here.",
+    }}
+
+    result = lambda_handler({"program_id": "bakur", "date": "2026-08-11"}, None)
+
+    assert result["statusCode"] == 200
+    assert result["body"]["status"] == "already_exists"
+    assert result["body"]["telemetry"]["bedrock_calls"] == 0
+
+
+@patch("lambda_function.get_processed_briefing")
+def test_today_backward_compatible(mock_get):
+    """program_id=None or 'today' should use the original Today's 5 path."""
+    mock_get.return_value = None
+
+    result = lambda_handler({"date": "2099-01-01"}, None)
+
+    assert result["statusCode"] == 404
+    # Should have called get_processed_briefing (briefings table)
+    mock_get.assert_called_once()
+
+
+@patch("lambda_function.programs_table")
+def test_program_not_found(mock_programs):
+    """Missing program briefing should return 404."""
+    mock_programs.get_item.return_value = {}
+
+    result = lambda_handler({"program_id": "kurdistan", "date": "2099-01-01"}, None)
+
+    assert result["statusCode"] == 404
+
+
 # ─── Test: Output Quality Validation ─────────────────────────────────────────
 
 def test_script_has_opening():

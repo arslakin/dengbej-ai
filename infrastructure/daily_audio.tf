@@ -27,9 +27,14 @@ resource "aws_iam_role_policy" "daily_audio_policy" {
         Resource = "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/${var.daily_audio_function_name}:*"
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:Query", "dynamodb:GetItem", "dynamodb:UpdateItem"]
-        Resource = [aws_dynamodb_table.briefings.arn, "${aws_dynamodb_table.briefings.arn}/index/*"]
+        Effect = "Allow"
+        Action = ["dynamodb:Query", "dynamodb:GetItem", "dynamodb:UpdateItem"]
+        Resource = [
+          aws_dynamodb_table.briefings.arn,
+          "${aws_dynamodb_table.briefings.arn}/index/*",
+          aws_dynamodb_table.programs.arn,
+          "${aws_dynamodb_table.programs.arn}/index/*"
+        ]
       },
       {
         Effect = "Allow"
@@ -62,6 +67,7 @@ resource "aws_lambda_function" "daily_audio" {
   environment {
     variables = {
       BRIEFINGS_TABLE = aws_dynamodb_table.briefings.name
+      PROGRAMS_TABLE  = aws_dynamodb_table.programs.name
       MODEL_ID        = var.bedrock_model_id
     }
   }
