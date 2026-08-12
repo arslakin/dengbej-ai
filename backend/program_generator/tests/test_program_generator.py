@@ -204,9 +204,23 @@ def test_duplicate_events_clustered():
 # ─── Test: Idempotency ──────────────────────────────────────────────────────
 
 def test_idempotency_existing_program_not_regenerated():
-    """If a program already exists for today, it should not be regenerated."""
-    existing_item = {"program_id": "rojava", "briefing_date": "2026-01-15", "story_count": 3}
+    """If a program's content fingerprint matches, it should not be regenerated."""
+    from lambda_function import compute_content_fingerprint, cluster_and_rank, Telemetry as T
+
     articles = [_make_article("a1", "SDF in Rojava", description="northeast Syria")]
+
+    # Pre-compute the fingerprint that clustering will produce
+    selected = cluster_and_rank(articles, "rojava", T())
+    expected_fp = compute_content_fingerprint(selected)
+
+    existing_item = {
+        "program_id": "rojava",
+        "briefing_date": "2026-01-15",
+        "story_count": 1,
+        "content_fingerprint": expected_fp,
+        "script_ku": "Rojbaş. Ev Dengbej e.",
+        "audio_url": "https://audio.dengbej.ai/rojava-2026-01-15.mp3",
+    }
 
     with patch("lambda_function.articles_table") as mock_articles, \
          patch("lambda_function.programs_table") as mock_programs:
@@ -218,9 +232,13 @@ def test_idempotency_existing_program_not_regenerated():
 
     assert response["statusCode"] == 200
     body = response["body"]
-    assert body["programs"]["rojava"]["status"] == "exists"
-    # put_item should NOT have been called
+    assert body["programs"]["rojava"]["status"] == "unchanged"
+    # put_item should NOT have been called — existing data preserved
     mock_programs.put_item.assert_not_called()
+    # No Bedrock calls for unchanged programs
+    assert body["telemetry"]["bedrock_calls"] == 0
+    # Script reused count incremented
+    assert body["telemetry"]["scripts_reused"] == 1
 
 
 # ─── Test: Force Regeneration ────────────────────────────────────────────────
@@ -383,6 +401,288 @@ def test_clustering_ranks_by_cross_source():
 
     # The multi-source cluster should rank first
     assert selected[0]["cross_source_count"] >= 2
+
+
+# ─── Test: Content Fingerprinting ────────────────────────────────────────────
+
+def test_fingerprint_same_stories_same_order():
+    """Same stories in same order → same fingerprint."""
+    from lambda_function import compute_content_fingerprint
+    stories = [
+        {"original_url": "https://a.com/1"},
+        {"original_url": "https://b.com/2"},
+    ]
+    fp1 = compute_content_fingerprint(stories)
+    fp2 = compute_content_fingerprint(stories)
+    assert fp1 == fp2
+
+
+def test_fingerprint_same_stories_different_order():
+    """Same stories in different order → same fingerprint (sorted)."""
+    from lambda_function import compute_content_fingerprint
+    stories1 = [{"original_url": "https://b.com/2"}, {"original_url": "https://a.com/1"}]
+    stories2 = [{"original_url": "https://a.com/1"}, {"original_url": "https://b.com/2"}]
+    assert compute_content_fingerprint(stories1) == compute_content_fingerprint(stories2)
+
+
+def test_fingerprint_story_added_changes():
+    """Adding a story changes the fingerprint."""
+    from lambda_function import compute_content_fingerprint
+    stories1 = [{"original_url": "https://a.com/1"}]
+    stories2 = [{"original_url": "https://a.com/1"}, {"original_url": "https://b.com/2"}]
+    assert compute_content_fingerprint(stories1) != compute_content_fingerprint(stories2)
+
+
+def test_fingerprint_story_removed_changes():
+    """Removing a story changes the fingerprint."""
+    from lambda_function import compute_content_fingerprint
+    stories1 = [{"original_url": "https://a.com/1"}, {"original_url": "https://b.com/2"}]
+    stories2 = [{"original_url": "https://a.com/1"}]
+    assert compute_content_fingerprint(stories1) != compute_content_fingerprint(stories2)
+
+
+def test_unchanged_program_zero_bedrock():
+    """Unchanged program with existing script should make 0 Bedrock calls."""
+    articles = [_make_article("a1", "SDF in Rojava operations", description="northeast Syria Kurdish")]
+    existing_item = {
+        "program_id": "rojava", "briefing_date": "2026-01-15",
+        "story_count": 1, "content_fingerprint": "",
+        "script_ku": "Rojbaş. Ev Dengbej e. Existing script.",
+        "audio_url": "https://audio.dengbej.ai/rojava.mp3",
+        "stories": [{"original_url": "https://example.com/a1", "headline": "SDF in Rojava"}],
+    }
+
+    with patch("lambda_function.articles_table") as mock_articles, \
+         patch("lambda_function.programs_table") as mock_programs:
+        mock_articles.scan.return_value = {"Items": articles}
+
+        # Compute what the fingerprint would be
+        from lambda_function import compute_content_fingerprint, cluster_and_rank, Telemetry as T
+        selected = cluster_and_rank(articles, "rojava", T())
+        expected_fp = compute_content_fingerprint(selected)
+
+        existing_item["content_fingerprint"] = expected_fp
+        mock_programs.get_item.return_value = {"Item": existing_item}
+        mock_programs.put_item.return_value = {}
+
+        response = _invoke_lambda({"program_id": "rojava", "date": "2026-01-15"})
+
+    body = response["body"]
+    assert body["programs"]["rojava"]["status"] == "unchanged"
+    assert body["telemetry"]["bedrock_calls"] == 0
+    assert body["telemetry"]["scripts_reused"] == 1
+    # put_item NOT called — existing script/audio preserved
+    mock_programs.put_item.assert_not_called()
+
+
+def test_changed_program_generates_script():
+    """Changed program should generate a new script."""
+    articles = [
+        _make_article("a1", "SDF in Rojava", description="northeast Syria"),
+        _make_article("a2", "New Rojava development", description="Kurdish autonomy northeast Syria"),
+    ]
+    existing_item = {
+        "program_id": "rojava", "briefing_date": "2026-01-15",
+        "story_count": 1, "content_fingerprint": "old_fingerprint_abc",
+        "stories": [{"original_url": "https://example.com/a1"}],
+    }
+
+    with patch("lambda_function.articles_table") as mock_articles, \
+         patch("lambda_function.programs_table") as mock_programs, \
+         patch("lambda_function.invoke_bedrock") as mock_bedrock:
+        mock_articles.scan.return_value = {"Items": articles}
+        mock_programs.get_item.return_value = {"Item": existing_item}
+        mock_programs.put_item.return_value = {}
+        mock_programs.update_item.return_value = {}
+        mock_bedrock.return_value = "Rojbaş. Ev Dengbej e."
+
+        response = _invoke_lambda({"program_id": "rojava", "date": "2026-01-15"})
+
+    body = response["body"]
+    assert body["programs"]["rojava"]["status"] == "generated"
+    assert body["telemetry"]["programs_generated"] == 1
+
+
+def test_empty_program_no_bedrock():
+    """Empty program should make 0 Bedrock calls."""
+    articles = [_make_article("a1", "Unrelated world story", description="Global economy")]
+
+    with patch("lambda_function.articles_table") as mock_articles, \
+         patch("lambda_function.programs_table") as mock_programs:
+        mock_articles.scan.return_value = {"Items": articles}
+        mock_programs.get_item.return_value = {}
+        mock_programs.put_item.return_value = {}
+
+        response = _invoke_lambda({"program_id": "rojhilat", "date": "2026-01-15"})
+
+    body = response["body"]
+    assert body["programs"]["rojhilat"]["status"] == "empty"
+    assert body["telemetry"]["bedrock_calls"] == 0
+
+
+def test_one_program_failure_others_succeed():
+    """One program failing should not prevent others."""
+    articles = [
+        _make_article("a1", "SDF in Rojava", description="northeast Syria Kurdish"),
+        _make_article("a2", "Turkey economy", description="Ankara markets Turkish"),
+    ]
+
+    call_count = [0]
+
+    def mock_get_item(**kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            raise ClientError({"Error": {"Code": "InternalServerError", "Message": "fail"}}, "GetItem")
+        return {}
+
+    with patch("lambda_function.articles_table") as mock_articles, \
+         patch("lambda_function.programs_table") as mock_programs:
+        mock_articles.scan.return_value = {"Items": articles}
+        mock_programs.get_item.side_effect = mock_get_item
+        mock_programs.put_item.return_value = {}
+
+        # Generate multiple programs — first should fail, others should succeed
+        response = _invoke_lambda({"date": "2026-01-15", "generate_scripts": False})
+
+    body = response["body"]
+    # At least some programs should have a result
+    statuses = [v.get("status") for v in body["programs"].values()]
+    assert "error" in statuses  # At least one failed
+    assert any(s in ("generated", "empty") for s in statuses)  # Others succeeded
+
+
+# ─── Test: Script Retry — Missing Script on Unchanged Program ────────────────
+
+def test_unchanged_program_missing_script_retries_generation():
+    """Unchanged fingerprint but missing script_ku should retry script generation."""
+    articles = [_make_article("a1", "SDF in Rojava operations", description="northeast Syria Kurdish")]
+    existing_item = {
+        "program_id": "rojava", "briefing_date": "2026-01-15",
+        "story_count": 1, "content_fingerprint": "",
+        "script_ku": None,  # Missing — needs retry
+        "audio_url": None,
+        "stories": [{"original_url": "https://example.com/a1", "headline": "SDF in Rojava"}],
+    }
+
+    with patch("lambda_function.articles_table") as mock_articles, \
+         patch("lambda_function.programs_table") as mock_programs, \
+         patch("lambda_function.invoke_bedrock") as mock_bedrock:
+        mock_articles.scan.return_value = {"Items": articles}
+
+        from lambda_function import compute_content_fingerprint, cluster_and_rank, Telemetry as T
+        selected = cluster_and_rank(articles, "rojava", T())
+        expected_fp = compute_content_fingerprint(selected)
+        existing_item["content_fingerprint"] = expected_fp
+
+        mock_programs.get_item.return_value = {"Item": existing_item}
+        mock_programs.put_item.return_value = {}
+        mock_programs.update_item.return_value = {}
+        mock_bedrock.return_value = "Rojbaş. Ev Dengbej e. Retry script."
+
+        response = _invoke_lambda({"program_id": "rojava", "date": "2026-01-15"})
+
+    body = response["body"]
+    assert body["programs"]["rojava"]["status"] == "unchanged"
+    # Script generation was retried and succeeded
+    assert body["telemetry"]["scripts_generated"] == 1
+    # scripts_reused should be 0 — we retried, not reused
+    assert body["telemetry"]["scripts_reused"] == 0
+    # put_item NOT called (program data unchanged, only script update via update_item)
+    mock_programs.put_item.assert_not_called()
+    # update_item called to store the retried script
+    mock_programs.update_item.assert_called()
+    # invoke_bedrock was called
+    mock_bedrock.assert_called_once()
+
+
+def test_unchanged_program_missing_script_retry_failure_leaves_null():
+    """Failed script retry should leave script_ku as None without crashing."""
+    articles = [_make_article("a1", "SDF in Rojava operations", description="northeast Syria Kurdish")]
+    existing_item = {
+        "program_id": "rojava", "briefing_date": "2026-01-15",
+        "story_count": 1, "content_fingerprint": "",
+        "script_ku": None,  # Missing — retry will fail
+        "audio_url": None,
+        "stories": [{"original_url": "https://example.com/a1", "headline": "SDF in Rojava"}],
+    }
+
+    with patch("lambda_function.articles_table") as mock_articles, \
+         patch("lambda_function.programs_table") as mock_programs, \
+         patch("lambda_function.invoke_bedrock") as mock_bedrock:
+        mock_articles.scan.return_value = {"Items": articles}
+
+        from lambda_function import compute_content_fingerprint, cluster_and_rank, Telemetry as T
+        selected = cluster_and_rank(articles, "rojava", T())
+        expected_fp = compute_content_fingerprint(selected)
+        existing_item["content_fingerprint"] = expected_fp
+
+        mock_programs.get_item.return_value = {"Item": existing_item}
+        mock_programs.put_item.return_value = {}
+        # Simulate Bedrock failure
+        mock_bedrock.side_effect = Exception("Bedrock timeout")
+
+        response = _invoke_lambda({"program_id": "rojava", "date": "2026-01-15"})
+
+    body = response["body"]
+    # Program status is still "unchanged" — not an error
+    assert body["programs"]["rojava"]["status"] == "unchanged"
+    # put_item NOT called — program data preserved
+    mock_programs.put_item.assert_not_called()
+    # Script generation was attempted but failed — scripts_generated stays 0
+    assert body["telemetry"]["scripts_generated"] == 0
+
+
+def test_unchanged_program_with_script_no_retry():
+    """Unchanged program WITH existing script should NOT call Bedrock at all."""
+    articles = [_make_article("a1", "SDF in Rojava operations", description="northeast Syria Kurdish")]
+    existing_item = {
+        "program_id": "rojava", "briefing_date": "2026-01-15",
+        "story_count": 1, "content_fingerprint": "",
+        "script_ku": "Rojbaş. Existing script intact.",
+        "audio_url": "https://audio.dengbej.ai/rojava.mp3",
+        "stories": [{"original_url": "https://example.com/a1", "headline": "SDF in Rojava"}],
+    }
+
+    with patch("lambda_function.articles_table") as mock_articles, \
+         patch("lambda_function.programs_table") as mock_programs, \
+         patch("lambda_function.invoke_bedrock") as mock_bedrock:
+        mock_articles.scan.return_value = {"Items": articles}
+
+        from lambda_function import compute_content_fingerprint, cluster_and_rank, Telemetry as T
+        selected = cluster_and_rank(articles, "rojava", T())
+        expected_fp = compute_content_fingerprint(selected)
+        existing_item["content_fingerprint"] = expected_fp
+
+        mock_programs.get_item.return_value = {"Item": existing_item}
+
+        response = _invoke_lambda({"program_id": "rojava", "date": "2026-01-15"})
+
+    body = response["body"]
+    assert body["programs"]["rojava"]["status"] == "unchanged"
+    assert body["telemetry"]["bedrock_calls"] == 0
+    assert body["telemetry"]["scripts_reused"] == 1
+    # Bedrock never called
+    mock_bedrock.assert_not_called()
+
+
+def test_empty_program_no_script_retry():
+    """Empty program should NOT attempt script generation even if script_ku is missing."""
+    articles = [_make_article("a1", "Unrelated global story", description="World economy")]
+
+    with patch("lambda_function.articles_table") as mock_articles, \
+         patch("lambda_function.programs_table") as mock_programs, \
+         patch("lambda_function.invoke_bedrock") as mock_bedrock:
+        mock_articles.scan.return_value = {"Items": articles}
+        mock_programs.get_item.return_value = {}
+        mock_programs.put_item.return_value = {}
+
+        response = _invoke_lambda({"program_id": "rojhilat", "date": "2026-01-15"})
+
+    body = response["body"]
+    assert body["programs"]["rojhilat"]["status"] == "empty"
+    assert body["telemetry"]["bedrock_calls"] == 0
+    # Bedrock never called for empty programs
+    mock_bedrock.assert_not_called()
 
 
 # ─── Run Tests ───────────────────────────────────────────────────────────────

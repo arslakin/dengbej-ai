@@ -36,7 +36,7 @@ resource "aws_iam_role_policy" "program_generator_policy" {
     Statement = [
       { Effect = "Allow", Action = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"], Resource = "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/${var.program_generator_function_name}:*" },
       { Effect = "Allow", Action = ["dynamodb:Scan", "dynamodb:Query", "dynamodb:GetItem"], Resource = [aws_dynamodb_table.articles.arn, "${aws_dynamodb_table.articles.arn}/index/*"] },
-      { Effect = "Allow", Action = ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query"], Resource = [aws_dynamodb_table.programs.arn, "${aws_dynamodb_table.programs.arn}/index/*"] },
+      { Effect = "Allow", Action = ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query", "dynamodb:UpdateItem"], Resource = [aws_dynamodb_table.programs.arn, "${aws_dynamodb_table.programs.arn}/index/*"] },
       { Effect = "Allow", Action = ["bedrock:InvokeModel"], Resource = ["arn:aws:bedrock:${var.aws_region}:*:inference-profile/${var.bedrock_model_id}", "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0"] }
     ]
   })
@@ -72,4 +72,30 @@ resource "aws_cloudwatch_log_group" "program_generator_logs" {
   name              = "/aws/lambda/${var.program_generator_function_name}"
   retention_in_days = 14
   tags              = { Name = "Dengbej AI Program Generator Logs", Project = "dengbej-ai" }
+}
+
+# ─── EventBridge Schedule ─────────────────────────────────────────────────────
+# Runs 30 minutes after the curation schedule (06:30, 18:30 UTC)
+# This ensures fresh articles are already classified by the curator before
+# program generation begins.
+
+resource "aws_cloudwatch_event_rule" "program_generation_schedule" {
+  name                = "${var.project_name}-program-generation-schedule"
+  description         = "Trigger program generation twice daily after curation"
+  schedule_expression = "cron(30 6,18 * * ? *)"
+
+  tags = { Name = "Dengbej AI Program Generation Schedule", Project = "dengbej-ai" }
+}
+
+resource "aws_cloudwatch_event_target" "program_generation_target" {
+  rule = aws_cloudwatch_event_rule.program_generation_schedule.name
+  arn  = aws_lambda_function.program_generator.arn
+}
+
+resource "aws_lambda_permission" "allow_eventbridge_program_generator" {
+  statement_id  = "AllowEventBridgeProgramGenerator"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.program_generator.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.program_generation_schedule.arn
 }

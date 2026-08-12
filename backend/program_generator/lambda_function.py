@@ -17,6 +17,7 @@ import os
 import time
 import re
 import sys
+import hashlib
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 from decimal import Decimal
@@ -53,6 +54,10 @@ class Telemetry:
         self.bedrock_input_tokens = 0
         self.bedrock_output_tokens = 0
         self.programs_generated = 0
+        self.programs_unchanged = 0
+        self.programs_empty = 0
+        self.scripts_generated = 0
+        self.scripts_reused = 0
         self.total_stories_selected = 0
         self.start_time = time.time()
         self.duration_ms = 0
@@ -65,12 +70,13 @@ class Telemetry:
 
 
 def lambda_handler(event, context):
-    """Generate program briefings."""
+    """Generate program briefings with content-based change detection."""
     telemetry = Telemetry()
 
     target_date = event.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     program_id = event.get("program_id")  # Optional: generate specific program only
     force = event.get("force", False)
+    generate_scripts = event.get("generate_scripts", True)  # Auto-generate scripts for changed programs
 
     # Determine which programs to generate
     if program_id:
@@ -99,31 +105,69 @@ def lambda_handler(event, context):
 
     # Generate each program
     results = {}
+    programs_needing_scripts = []
+
     for pid in programs_to_generate:
-        # Idempotency check
-        if not force:
-            existing = get_existing_program(pid, target_date)
-            if existing:
-                results[pid] = {"status": "exists", "story_count": existing.get("story_count", 0)}
+        try:
+            # Get candidates for this program
+            candidates = [a for a in articles if pid in article_programs.get(a["article_id"], set())]
+
+            if not candidates:
+                # Empty program
+                existing = get_existing_program(pid, target_date)
+                if not existing or existing.get("story_count", 0) != 0:
+                    store_program_briefing(pid, target_date, [], content_fingerprint="empty")
+                results[pid] = {"status": "empty", "story_count": 0}
+                telemetry.programs_empty += 1
                 continue
 
-        # Get candidates for this program
-        candidates = [a for a in articles if pid in article_programs.get(a["article_id"], set())]
+            # Cluster and rank
+            selected = cluster_and_rank(candidates, pid, telemetry)
 
-        if not candidates:
-            results[pid] = {"status": "empty", "story_count": 0}
-            store_program_briefing(pid, target_date, [])
+            # Calculate content fingerprint
+            fingerprint = compute_content_fingerprint(selected)
+
+            # Check if content actually changed
+            existing = get_existing_program(pid, target_date)
+            if existing and not force:
+                existing_fingerprint = existing.get("content_fingerprint", "")
+                if existing_fingerprint == fingerprint:
+                    # Content unchanged — check if script needs retry
+                    existing_script = existing.get("script_ku")
+                    if existing_script:
+                        # Complete: content + script intact, nothing to do
+                        results[pid] = {"status": "unchanged", "story_count": len(selected)}
+                        telemetry.programs_unchanged += 1
+                        telemetry.scripts_reused += 1
+                    else:
+                        # Content matches but script is missing — retry generation
+                        results[pid] = {"status": "unchanged", "story_count": len(selected)}
+                        telemetry.programs_unchanged += 1
+                        programs_needing_scripts.append(pid)
+                    continue
+
+            # Content changed or new — store updated program
+            store_program_briefing(pid, target_date, selected, content_fingerprint=fingerprint)
+            results[pid] = {"status": "generated", "story_count": len(selected)}
             telemetry.programs_generated += 1
-            continue
+            telemetry.total_stories_selected += len(selected)
+            programs_needing_scripts.append(pid)
 
-        # Cluster and rank
-        selected = cluster_and_rank(candidates, pid, telemetry)
+        except Exception as e:
+            print(f"Program {pid} failed: {e}")
+            results[pid] = {"status": "error", "error": str(e)[:100]}
 
-        # Store program briefing
-        store_program_briefing(pid, target_date, selected)
-        results[pid] = {"status": "generated", "story_count": len(selected)}
-        telemetry.programs_generated += 1
-        telemetry.total_stories_selected += len(selected)
+    # Generate scripts for changed programs (if enabled)
+    if generate_scripts and programs_needing_scripts:
+        for pid in programs_needing_scripts:
+            try:
+                script = generate_program_script_inline(pid, target_date, telemetry)
+                if script:
+                    telemetry.scripts_generated += 1
+                    results[pid]["script_generated"] = True
+            except Exception as e:
+                print(f"Script generation failed for {pid}: {e}")
+                results[pid]["script_error"] = str(e)[:100]
 
     telemetry.finish()
     print(f"Telemetry: {json.dumps(telemetry.to_dict())}")
@@ -245,7 +289,7 @@ def get_existing_program(program_id, date_str):
         return None
 
 
-def store_program_briefing(program_id, date_str, stories):
+def store_program_briefing(program_id, date_str, stories, content_fingerprint=""):
     """Store program briefing in DynamoDB."""
     program = PROGRAM_MAP.get(program_id)
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -258,9 +302,132 @@ def store_program_briefing(program_id, date_str, stories):
         "label_en": program.label_en if program else program_id,
         "story_count": len(stories),
         "stories": stories,
+        "content_fingerprint": content_fingerprint,
         "script_ku": None,
         "audio_url": None,
     }
 
     programs_table.put_item(Item=json.loads(json.dumps(item, default=str), parse_float=Decimal))
-    print(f"Program stored: {program_id} ({len(stories)} stories)")
+    print(f"Program stored: {program_id} ({len(stories)} stories, fingerprint: {content_fingerprint[:12]}...)")
+
+
+def compute_content_fingerprint(stories):
+    """
+    Compute a stable fingerprint for a set of stories.
+    Based on sorted unique article URLs — stable regardless of ordering.
+    """
+    urls = sorted(set(s.get("original_url", "") for s in stories if s.get("original_url")))
+    content = "|".join(urls)
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()[:24]
+
+
+def generate_program_script_inline(program_id, date_str, telemetry):
+    """Generate a Kurmanji script for a program (inline, after story generation)."""
+    program = get_existing_program(program_id, date_str)
+    if not program:
+        return None
+
+    stories = program.get("stories", [])
+    if not stories:
+        return None
+
+    # Build prompt
+    story_blocks = []
+    for i, story in enumerate(stories, 1):
+        block = f"Story {i}:\nHeadline: {story.get('headline', '')}\nCategory: {story.get('category', program_id)}\nDescription: {story.get('feed_description', '')}\nSource: {story.get('primary_source', '')}"
+        story_blocks.append(block)
+
+    stories_text = "\n\n".join(story_blocks)
+    story_count = len(stories)
+
+    prompt = f"""You are composing a Kurmanji Kurdish news segment for Dengbej audio service.
+Program: {program_id} | Date: {date_str} | Stories: {story_count}
+
+IMPORTANT — DUPLICATE DETECTION:
+Multiple source stories below may describe the SAME event from different publishers.
+If stories overlap, synthesize them into ONE segment. Do NOT narrate each source separately.
+State each fact ONLY ONCE.
+
+LANGUAGE RULES:
+- Write DIRECTLY in natural Kurmanji Kurdish
+- Use ONLY standard, widely understood Kurmanji vocabulary
+- NEVER invent a Kurdish-looking word
+- NEVER insert English words
+- Do NOT use the characters "ğ" or "ı"
+
+NUMBER ACCURACY (CRITICAL):
+- Preserve the EXACT semantic value of every number
+- 40 = çil (NOT çardeh), 14 = çardeh
+- If uncertain, keep the numeric form
+
+GEOGRAPHIC TERMINOLOGY:
+- Rojhilata Navîn = Middle East (NEVER "Rojava Navîn")
+
+FACTUAL RULES:
+- Use ONLY facts from the supplied stories
+- Do NOT invent facts, quotes, or background context
+- If a source provides only a headline, produce a SHORT bulletin
+
+LENGTH AND REPETITION:
+- Length must match available factual material — never pad
+- NEVER repeat the same fact in different words
+
+STRUCTURE:
+- Opening: "Rojbaş. Ev Dengbej e. {date_str}."
+- Tell the stories concisely
+- Closing: "Ev bû Dengbej. Hêvî dikin ku sibê jî li gel we bin."
+
+OUTPUT: Write ONLY the spoken text.
+
+STORIES:
+
+{stories_text}
+
+KURDISH BROADCAST SCRIPT:"""
+
+    try:
+        result = invoke_bedrock(prompt, max_tokens=2000, telemetry=telemetry)
+        if result:
+            script = result.strip()
+            # Store script
+            now_iso = datetime.now(timezone.utc).isoformat()
+            programs_table.update_item(
+                Key={"program_id": program_id, "briefing_date": date_str},
+                UpdateExpression="SET script_ku = :script, script_meta = :meta",
+                ExpressionAttributeValues={
+                    ":script": script,
+                    ":meta": {
+                        "script_generated_at": now_iso,
+                        "model_id": MODEL_ID,
+                        "script_chars": len(script),
+                        "bedrock_input_tokens": telemetry.bedrock_input_tokens,
+                        "bedrock_output_tokens": telemetry.bedrock_output_tokens,
+                    },
+                },
+            )
+            print(f"Script generated for {program_id} ({len(script)} chars)")
+            return script
+    except Exception as e:
+        print(f"Inline script generation failed for {program_id}: {e}")
+    return None
+
+
+def invoke_bedrock(prompt, max_tokens=2000, telemetry=None):
+    """Invoke Bedrock and track usage."""
+    request_body = {
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": max_tokens,
+        "temperature": 0.4,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    response = bedrock_runtime.invoke_model(
+        modelId=MODEL_ID,
+        body=json.dumps(request_body),
+    )
+    response_body = json.loads(response["body"].read())
+    if telemetry:
+        telemetry.bedrock_calls += 1
+        usage = response_body.get("usage", {})
+        telemetry.bedrock_input_tokens += usage.get("input_tokens", 0)
+        telemetry.bedrock_output_tokens += usage.get("output_tokens", 0)
+    return response_body["content"][0]["text"].strip()
