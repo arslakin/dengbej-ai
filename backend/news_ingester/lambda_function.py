@@ -75,6 +75,57 @@ def store_article(article):
         raise
 
 
+# ─── Image Extraction ────────────────────────────────────────────────────────
+
+def extract_source_image_url(entry):
+    """
+    Extract source image URL from RSS entry using priority chain:
+    1. media:content with medium="image" or no medium attribute
+    2. media:thumbnail
+    3. enclosure with type starting with "image/"
+    4. null (no image available)
+
+    Validation: URL must be absolute http/https, max 2048 chars.
+    No downloading. No scraping. No rehosting.
+    """
+    # Priority 1: media:content (medium="image" or unspecified medium)
+    media_contents = entry.get("media_content", [])
+    for media in media_contents:
+        medium = media.get("medium", "")
+        url = media.get("url", "").strip()
+        if medium in ("image", ""):
+            if _is_valid_image_url(url):
+                return url
+
+    # Priority 2: media:thumbnail
+    media_thumbnails = entry.get("media_thumbnail", [])
+    for thumb in media_thumbnails:
+        url = thumb.get("url", "").strip()
+        if _is_valid_image_url(url):
+            return url
+
+    # Priority 3: enclosure with image MIME type
+    enclosures = entry.get("enclosures", [])
+    for enc in enclosures:
+        enc_type = enc.get("type", "")
+        url = enc.get("href", enc.get("url", "")).strip()
+        if enc_type.startswith("image/") and _is_valid_image_url(url):
+            return url
+
+    return None
+
+
+def _is_valid_image_url(url):
+    """Validate URL is absolute http(s) and within length limit."""
+    if not url:
+        return False
+    if not url.startswith(("http://", "https://")):
+        return False
+    if len(url) > 2048:
+        return False
+    return True
+
+
 # ─── Main Handler ────────────────────────────────────────────────────────────
 
 def lambda_handler(event, context):
@@ -118,6 +169,7 @@ def lambda_handler(event, context):
                     continue
 
                 # Build article record
+                image_url = extract_source_image_url(entry)
                 article = {
                     "article_id": generate_article_id(link),
                     "source_name": source_name,
@@ -127,6 +179,9 @@ def lambda_handler(event, context):
                     "ingested_at": ingested_at,
                     "feed_description": entry.get("summary", "").strip()[:1000],
                     "processing_status": "pending",
+                    "source_language": "en",
+                    "source_image_url": image_url,
+                    "source_image_source": source_name if image_url else None,
                 }
 
                 # Attempt to store (dedup via condition expression)

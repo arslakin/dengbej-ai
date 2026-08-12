@@ -99,3 +99,11 @@ variable "program_generator_function_name" {
   type        = string
   default     = "dengbej-ai-program-generator"
 }
+
+# ─── Events Table (News Presentation V2) ─────────────────────────────────────
+
+variable "events_table_name" {
+  description = "DynamoDB table for canonical news events"
+  type        = string
+  default     = "dengbej-events"
+}
