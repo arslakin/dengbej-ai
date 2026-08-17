@@ -65,6 +65,13 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;
     }
+    .builder-link {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.8rem; margin-top: 0.5rem;
+    }
+    .builder-link a { color: var(--accent); text-decoration: none; font-weight: 500; }
+    .builder-link a:hover { text-decoration: underline; }
+    .builder-link a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .listen-area { background: var(--bg-listen); border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; }
     .ci-bejim {
       font-family: Georgia, serif; font-size: 1.2rem; font-weight: 700;
@@ -86,6 +93,11 @@
     .audio-status {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.75rem; color: var(--text-muted);
+    }
+    .audio-placeholder {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.85rem; color: var(--text-muted); font-style: italic;
+      padding: 0.5rem 0;
     }
     .beje-btn {
       font-family: Georgia, serif; font-size: 1.1rem; font-weight: 700;
@@ -254,16 +266,16 @@
   <main class="container" id="main-content" aria-live="polite">
     <section class="section-intro">
       <h2 id="section-title">Today's Dengbej</h2>
-      <p id="section-desc">The five stories you should know today.</p>
+      <p id="section-desc">Dengbej AI reimagines the Kurdish dengbêj storytelling tradition using generative AI and serverless AWS technology.</p>
       <p class="date" id="currentDate"></p>
+      <p class="builder-link"><a href="https://builder.aws.com/content/3AtwFZmEnbM4cs3I7y25DHJyJlo/aideas-dengbej-ai-kurdish-storytelling-with-generative-ai" target="_blank" rel="noopener noreferrer">Read the AWS Builder story →</a></p>
     </section>
 
     <section class="listen-area" aria-label="Program selection">
       <p class="ci-bejim" id="ci-bejim-label">Çi bêjim?</p>
       <div class="program-choices" role="radiogroup" aria-labelledby="ci-bejim-label"></div>
       <div class="beje-row">
-        <button class="beje-btn" id="beje-btn" disabled aria-label="Play daily briefing">Bêje!</button>
-        <p class="audio-status" id="audio-status">Tê amadekirin</p>
+        <p class="audio-placeholder">🎙️ Kurdish audio — coming soon</p>
       </div>
     </section>
 
@@ -276,8 +288,8 @@
 
   <div class="container">
     <section class="about-section" aria-labelledby="about-heading">
-      <h2 id="about-heading">About</h2>
-      <p>Five important global stories. Selected daily from BBC News, Deutsche Welle, and Al Jazeera English. Summarized with AI. Available in English and Kurdish.</p>
+      <h2 id="about-heading">What is a Dengbêj?</h2>
+      <p>For centuries, dengbêjs have preserved Kurdish history through oral storytelling — sharing news, memories, and culture through spoken narratives that connect communities. Dengbej AI transforms this tradition using generative AI, creating Kurdish radio-style programs from current events.</p>
     </section>
     <section class="cta-section">
       <p>Have an article you want summarized? <a href="story.html">Open Story Generator →</a></p>
@@ -392,31 +404,12 @@
     }
 
     function updateBejeState() {
-      var bejeBtn = document.getElementById("beje-btn");
-      var statusEl = document.getElementById("audio-status");
-      if (selectedProgram === "today") {
-        if (briefingData && briefingData.daily_audio) {
-          if (briefingData.daily_audio.available && briefingData.daily_audio.url) {
-            bejeBtn.disabled = false;
-            bejeBtn.setAttribute("aria-label", currentLang === "ku" ? "Nûçeyên îro bibihîze" : "Listen to today's news");
-            statusEl.textContent = currentLang === "ku" ? "Dengê Kurdî amade ye" : "Kurdish audio ready";
-          } else if (briefingData.daily_audio.script_available) {
-            bejeBtn.disabled = true;
-            bejeBtn.setAttribute("aria-label", currentLang === "ku" ? "Deng tê amadekirin" : "Audio being prepared");
-            statusEl.textContent = currentLang === "ku" ? "Skrîpta amade ye — deng tê amadekirin" : "Script ready — audio coming soon";
-          } else {
-            bejeBtn.disabled = true;
-            statusEl.textContent = currentLang === "ku" ? "Tê amadekirin" : "Being prepared";
-          }
-        } else {
-          bejeBtn.disabled = true;
-          statusEl.textContent = currentLang === "ku" ? "Tê amadekirin" : "Being prepared";
-        }
-      } else {
-        bejeBtn.disabled = true;
-        bejeBtn.setAttribute("aria-label", currentLang === "ku" ? "Bernameya " + selectedProgram + " — tê amadekirin" : "Program coming soon");
-        statusEl.textContent = currentLang === "ku" ? "Ev bernameyê tê amadekirin" : "This program is coming soon";
-      }
+      var bejeRow = document.querySelector(".beje-row");
+      if (!bejeRow) return;
+      // Audio not available for any program currently — show placeholder text
+      bejeRow.innerHTML = '<p class="audio-placeholder">' +
+        (currentLang === "ku" ? "🎙️ Dengê Kurdî — zû tê" : "🎙️ Kurdish audio — coming soon") +
+        '</p>';
     }
 
     function setLanguage(lang) {
@@ -427,7 +420,7 @@
       document.documentElement.lang = lang === "ku" ? "ku" : "en";
       document.getElementById("ci-bejim-label").textContent = lang === "ku" ? "Çi bêjim?" : "What should I tell you?";
       document.getElementById("section-title").textContent = lang === "ku" ? "Nûçeyên Dengbej" : "Today's Dengbej";
-      document.getElementById("section-desc").textContent = lang === "ku" ? "Pênc nûçeyên ku divê îro bizanin." : "The five stories you should know today.";
+      document.getElementById("section-desc").textContent = lang === "ku" ? "Dengbej AI kevneşopiya dengbêjiya Kurdî bi AI û AWS-ê nûve dike." : "Dengbej AI reimagines the Kurdish dengbêj storytelling tradition using generative AI and serverless AWS technology.";
       renderPrograms();
       updateBejeState();
       if (briefingData) renderBriefing(briefingData);
