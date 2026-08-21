@@ -1,670 +1,979 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ku" dir="ltr">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dengbej AI</title>
+  <title>Dengbêj AI — Radyoya Nûçeyan bi Kurdî</title>
+  <meta name="description" content="Kurdish AI News Radio — Listen to the latest world news narrated in the dengbêj storytelling tradition">
 
   <style>
-    *, *::before, *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface-hover: #222633;
+      --border: #2a2e3d;
+      --text: #e8eaed;
+      --text-muted: #9aa0b0;
+      --accent: #4f9cf7;
+      --accent-glow: rgba(79, 156, 247, 0.15);
+      --accent-dark: #3a7bd5;
+      --gold: #f0b429;
+      --gold-muted: rgba(240, 180, 41, 0.12);
+      --success: #4caf7d;
+      --radius: 12px;
     }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background: #f4f4f4;
+      background: var(--bg);
       min-height: 100vh;
-      padding: 24px 16px;
-      color: #1a1a1a;
+      color: var(--text);
       -webkit-font-smoothing: antialiased;
+      padding-bottom: 140px; /* space for radio bar */
     }
 
-    /* ── Card container ── */
-    .container {
-      max-width: 720px;
+    /* ── Top Header ── */
+    .site-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-inner {
+      max-width: 900px;
       margin: 0 auto;
-      background: #ffffff;
-      border-radius: 12px;
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-      padding: 36px 32px;
-    }
-
-    /* ── Header ── */
-    .header {
-      margin-bottom: 28px;
-    }
-
-    .header h1 {
-      font-size: clamp(22px, 5vw, 28px);
-      font-weight: 700;
-      color: #1a1a1a;
-      line-height: 1.2;
-      margin-bottom: 10px;
-    }
-
-    .header p {
-      font-size: 15px;
-      color: #555;
-      line-height: 1.6;
-    }
-
-    .header p strong {
-      color: #1a1a1a;
-    }
-
-    /* ── Divider ── */
-    .divider {
-      border: none;
-      border-top: 1px solid #ebebeb;
-      margin: 24px 0;
-    }
-
-    /* ── Form elements ── */
-    .field {
-      margin-bottom: 20px;
-    }
-
-    label {
-      display: block;
-      font-size: 14px;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 8px;
-    }
-
-    input[type="url"],
-    textarea {
-      width: 100%;
-      font-family: inherit;
-      font-size: 15px;
-      color: #1a1a1a;
-      background: #fafafa;
-      border: 1.5px solid #ddd;
-      border-radius: 8px;
-      padding: 12px 14px;
-      transition: border-color 0.2s, box-shadow 0.2s;
-      appearance: none;
-      -webkit-appearance: none;
-    }
-
-    input[type="url"]:focus,
-    textarea:focus {
-      outline: none;
-      border-color: #2a7ae2;
-      box-shadow: 0 0 0 3px rgba(42, 122, 226, 0.12);
-      background: #fff;
-    }
-
-    textarea {
-      resize: vertical;
-      min-height: 160px;
-      line-height: 1.6;
-    }
-
-    /* ── Button ── */
-    button#generateBtn {
-      display: block;
-      width: 100%;
-      padding: 15px 24px;
-      font-family: inherit;
-      font-size: 16px;
-      font-weight: 600;
-      color: #fff;
-      background: #2a7ae2;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
-      margin-top: 4px;
-    }
-
-    button#generateBtn:hover:not(:disabled) {
-      background: #1d63c0;
-    }
-
-    button#generateBtn:active:not(:disabled) {
-      transform: scale(0.99);
-    }
-
-    button#generateBtn:disabled {
-      background: #b0c4de;
-      cursor: not-allowed;
-    }
-
-    /* ── Loading ── */
-    .loading {
-      display: none;
-      margin-top: 24px;
-      padding: 16px 18px;
-      background: #eef4fd;
-      border-left: 4px solid #2a7ae2;
-      border-radius: 8px;
-      font-size: 15px;
-      color: #1a4a8a;
-    }
-
-    .loading.active {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
       gap: 10px;
     }
 
-    .loading-spinner {
-      font-size: 20px;
+    .brand-icon {
+      font-size: 28px;
       line-height: 1;
+    }
+
+    .brand-text h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+    }
+
+    .brand-text .tagline {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-link {
+      font-size: 13px;
+      color: var(--accent);
+      text-decoration: none;
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .header-link:hover {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+    }
+
+    /* ── Main Content ── */
+    .main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+
+    /* ── Section header ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── Story Cards ── */
+    .stories-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .story-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      transition: border-color 0.2s, background 0.2s;
+      cursor: default;
+    }
+
+    .story-card:hover {
+      border-color: var(--accent);
+      background: var(--surface-hover);
+    }
+
+    .story-card.playing {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .story-top {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .story-thumbnail {
+      width: 80px;
+      height: 80px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: var(--border);
       flex-shrink: 0;
+    }
+
+    .story-thumbnail-placeholder {
+      width: 80px;
+      height: 80px;
+      border-radius: 8px;
+      background: var(--gold-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      flex-shrink: 0;
+    }
+
+    .story-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .story-source {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+
+    .story-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.4;
+      margin-bottom: 8px;
+    }
+
+    .story-context {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 12px;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .story-footer {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .play-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .play-btn:hover {
+      background: var(--accent-dark);
+    }
+
+    .play-btn:active {
+      transform: scale(0.96);
+    }
+
+    .play-btn.active {
+      background: var(--success);
+    }
+
+    .story-link {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-decoration: none;
+      border-bottom: 1px dashed var(--border);
+      transition: color 0.2s;
+    }
+
+    .story-link:hover {
+      color: var(--accent);
+    }
+
+    .story-date {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* ── Radio Bar (bottom) ── */
+    .radio-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 12px 20px;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .radio-bar-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .radio-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .radio-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .radio-btn:hover { background: var(--accent-dark); }
+    .radio-btn:active { transform: scale(0.93); }
+    .radio-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .radio-btn.small {
+      width: 32px;
+      height: 32px;
+      font-size: 14px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .radio-btn.small:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .radio-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .radio-now-playing {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .radio-status {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .radio-progress {
+      width: 100%;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+
+    .radio-progress-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.3s linear;
+    }
+
+    .radio-mode-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+      flex-shrink: 0;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .radio-mode-toggle:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
+    .radio-mode-toggle.active {
+      background: var(--gold-muted);
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
+    /* ── Loading / empty states ── */
+    .loading-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+    }
+
+    .loading-spinner {
+      font-size: 32px;
       animation: spin 1.5s linear infinite;
+      margin-bottom: 16px;
     }
 
     @keyframes spin {
       from { transform: rotate(0deg); }
-      to   { transform: rotate(360deg); }
+      to { transform: rotate(360deg); }
     }
 
-    .loading-text strong {
-      display: block;
-      margin-bottom: 4px;
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
     }
 
-    .loading-text p {
-      font-size: 13px;
-      color: #3a6aaa;
-      margin: 0;
-    }
-
-    /* ── Error / info banner ── */
-    .error {
-      display: none;
-      margin-top: 20px;
-      padding: 14px 16px;
-      border-left: 4px solid #e53935;
-      border-radius: 8px;
-      background: #fff5f5;
-      color: #b71c1c;
-      font-size: 14px;
-      line-height: 1.5;
-    }
-
-    .error.active {
-      display: block;
-    }
-
-    /* ── Output section ── */
-    .output-section {
-      margin-top: 28px;
-    }
-
-    .output-title {
-      font-size: 18px;
-      font-weight: 700;
-      color: #1a1a1a;
+    .empty-state p {
+      color: var(--text-muted);
+      font-size: 15px;
       margin-bottom: 16px;
     }
 
-    /* English summary */
-    #summary {
-      display: none;
-      padding: 20px;
-      background: #f9fafb;
-      border: 1.5px solid #e8e8e8;
-      border-radius: 10px;
-      font-size: 16px;
-      line-height: 1.75;
-      color: #222;
-      margin-bottom: 16px;
-    }
-
-    #summary.active {
-      display: block;
-    }
-
-    #summary .section-label {
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #2a7ae2;
-      margin-bottom: 10px;
-    }
-
-    /* Translations */
-    #kurdishText,
-    #turkishText {
-      display: none;
-      padding: 20px;
-      background: #fffbf5;
-      border: 1.5px solid #f0d9b5;
-      border-radius: 10px;
-      margin-bottom: 16px;
-    }
-
-    #kurdishText .section-label,
-    #turkishText .section-label {
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #b45309;
-      margin-bottom: 10px;
-    }
-
-    #kurdishContent,
-    #turkishContent {
-      font-size: 16px;
-      line-height: 1.75;
-      color: #222;
-    }
-
-    /* Audio player */
-    .audio-container {
-      display: none;
-      padding: 20px;
-      background: #f0f7ff;
-      border: 1.5px solid #c3daf9;
-      border-radius: 10px;
-    }
-
-    .audio-container.active {
-      display: block;
-    }
-
-    .audio-container .section-label {
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #1d63c0;
-      margin-bottom: 12px;
-    }
-
-    audio {
-      width: 100%;
-      display: block;
-      border-radius: 6px;
-      outline: none;
-    }
-
-    /* ── Options panel ── */
-    .options-panel {
-      margin-bottom: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .options-group {
-      display: flex;
-      flex-direction: column;
+    .generate-btn {
+      display: inline-flex;
+      align-items: center;
       gap: 8px;
-    }
-
-    .options-group-label {
+      padding: 12px 24px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
       font-size: 14px;
       font-weight: 600;
-      color: #333;
-      margin-bottom: 2px;
-    }
-
-    .checkbox-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
       cursor: pointer;
-      user-select: none;
+      transition: background 0.2s;
     }
 
-    .checkbox-row input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      accent-color: #2a7ae2;
-      cursor: pointer;
-      flex-shrink: 0;
+    .generate-btn:hover { background: var(--accent-dark); }
+    .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Powered By ── */
+    .powered-by {
+      text-align: center;
+      margin-top: 32px;
+      padding: 16px;
+      font-size: 12px;
+      color: var(--text-muted);
     }
 
-    .checkbox-row input[type="checkbox"]:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .checkbox-row span {
-      font-size: 15px;
-      color: #333;
-    }
-
-    .checkbox-row .badge {
-      font-size: 11px;
-      font-weight: 600;
-      color: #888;
-      background: #f0f0f0;
-      border-radius: 4px;
-      padding: 2px 6px;
-      margin-left: 2px;
-    }
-
-    /* Dengbej mode toggle row */
-    .toggle-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      cursor: pointer;
-      user-select: none;
-      padding: 14px 16px;
-      background: #fafafa;
-      border: 1.5px solid #e8e8e8;
-      border-radius: 8px;
-      transition: border-color 0.2s, background 0.2s;
-    }
-
-    .toggle-row:hover {
-      border-color: #2a7ae2;
-      background: #f5f9ff;
-    }
-
-    .toggle-row input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      accent-color: #2a7ae2;
-      cursor: pointer;
-      flex-shrink: 0;
-    }
-
-    .toggle-row .toggle-label {
-      font-size: 15px;
-      font-weight: 600;
-      color: #1a1a1a;
-    }
-
-    .toggle-row .toggle-desc {
-      font-size: 13px;
-      color: #777;
-      margin-top: 2px;
+    .powered-by a {
+      color: var(--accent);
+      text-decoration: none;
     }
 
     /* ── Mobile ── */
     @media (max-width: 600px) {
-      body {
-        padding: 16px 12px;
-      }
-
-      .container {
-        padding: 24px 18px;
-        border-radius: 10px;
-      }
-
-      button#generateBtn {
-        font-size: 17px;
-        padding: 16px;
-      }
+      .main { padding: 16px 12px; }
+      .story-top { flex-direction: column; gap: 12px; }
+      .story-thumbnail, .story-thumbnail-placeholder { width: 100%; height: 140px; }
+      .header-link { display: none; }
+      .radio-mode-toggle span { display: none; }
+      .radio-bar { padding: 10px 12px; }
     }
   </style>
 </head>
 
 <body>
 
-<div class="container">
-
-  <div class="header">
-    <h1>🎙️ Dengbej AI Story Generator</h1>
-    <p>
-      Paste text or provide an article URL to transform it into a bilingual story
-      inspired by the <strong>dengbêj</strong> storytelling tradition.
-      Get both English and Kurdish versions with English audio narration.
-    </p>
-  </div>
-
-  <hr class="divider">
-
-  <div class="field">
-    <label for="urlInput">Article URL <span style="font-weight:400;color:#888">(optional)</span></label>
-    <input
-      type="url"
-      id="urlInput"
-      placeholder="https://example.com/article"
-    />
-  </div>
-
-  <div class="field">
-    <label for="textInput">Or paste text directly</label>
-    <textarea
-      id="textInput"
-      rows="8"
-      placeholder="Paste your article, story, or text here..."
-    ></textarea>
-  </div>
-
-  <!-- ── Options panel ── -->
-  <div class="options-panel">
-
-    <!-- Language selection -->
-    <div class="options-group">
-      <div class="options-group-label">Output Languages</div>
-
-      <label class="checkbox-row">
-        <input type="checkbox" id="langEnglish" checked disabled />
-        <span>English <span class="badge">always on</span></span>
-      </label>
-
-      <label class="checkbox-row">
-        <input type="checkbox" id="langKurdish" />
-        <span>Kurdish (Kurmanji)</span>
-      </label>
-
-      <label class="checkbox-row">
-        <input type="checkbox" id="langTurkish" />
-        <span>Turkish</span>
-      </label>
-    </div>
-
-    <!-- Dengbej mode -->
-    <label class="toggle-row">
-      <input type="checkbox" id="dengbejMode" />
-      <div>
-        <div class="toggle-label">🎙️ Enable Dengbej Storytelling Mode</div>
-        <div class="toggle-desc">Narrate in the style of a traditional Kurdish dengbêj oral storyteller</div>
+<!-- ── Header ── -->
+<header class="site-header">
+  <div class="header-inner">
+    <div class="brand">
+      <span class="brand-icon">🎙️</span>
+      <div class="brand-text">
+        <h1>Dengbêj AI</h1>
+        <div class="tagline">Radyoya Nûçeyan bi Kurdî</div>
       </div>
+    </div>
+    <div class="header-actions">
+      <a href="generator.html" class="header-link">Amûra Çîrokê</a>
+    </div>
+  </div>
+</header>
+
+<!-- ── Main ── -->
+<main class="main">
+
+  <div class="section-header">
+    <div class="section-title">
+      <span class="live-dot"></span>
+      Nûçeyên Herî Dawî — Latest Stories
+    </div>
+  </div>
+
+  <div id="storiesContainer" class="stories-grid">
+    <div class="loading-state" id="loadingState">
+      <div class="loading-spinner">⏳</div>
+      <p>Nûçe tên barkirin... Loading stories...</p>
+    </div>
+  </div>
+
+  <div class="powered-by">
+    Powered by <a href="https://aws.amazon.com" target="_blank" rel="noopener">AWS</a> —
+    Amazon Bedrock &middot; Polly &middot; Lambda &middot; DynamoDB &middot; S3
+  </div>
+
+</main>
+
+<!-- ── Radio Bar ── -->
+<div class="radio-bar">
+  <div class="radio-bar-inner">
+    <div class="radio-controls">
+      <button class="radio-btn small" id="prevBtn" title="Berê / Previous" disabled>⏮</button>
+      <button class="radio-btn" id="playPauseBtn" title="Lêxe / Play" disabled>▶</button>
+      <button class="radio-btn small" id="nextBtn" title="Pêş / Next" disabled>⏭</button>
+    </div>
+    <div class="radio-info">
+      <div class="radio-now-playing" id="nowPlaying">Nûçeyek hilbijêre — Select a story</div>
+      <div class="radio-status" id="radioStatus">Ready</div>
+      <div class="radio-progress"><div class="radio-progress-bar" id="progressBar"></div></div>
+    </div>
+    <label class="radio-mode-toggle" id="radioModeToggle" title="Radio Mode — play all stories in sequence">
+      📻 <span>Radio</span>
     </label>
-
   </div>
-
-  <button id="generateBtn" onclick="generateStory()">
-    Generate Story
-  </button>
-
-  <div id="loading" class="loading">
-    <span class="loading-spinner">⏳</span>
-    <div class="loading-text">
-      <strong>Creating your story...</strong>
-      <p>Summarising, translating to Kurdish, and generating audio. This may take 15–20 seconds.</p>
-    </div>
-  </div>
-
-  <div id="error" class="error"></div>
-
-  <div class="output-section">
-
-    <div id="summary">
-      <div class="section-label">📝 English Story</div>
-      <div id="summaryContent"></div>
-    </div>
-
-    <div id="kurdishText">
-      <div class="section-label">📖 Kurdish Translation (Kurmanji)</div>
-      <div id="kurdishContent"></div>
-    </div>
-
-    <div id="turkishText">
-      <div class="section-label">📖 Turkish Translation</div>
-      <div id="turkishContent"></div>
-    </div>
-
-    <div id="audioContainer" class="audio-container">
-      <div class="section-label">🔊 English Narration</div>
-      <audio id="audioPlayer" controls preload="metadata"></audio>
-    </div>
-
-  </div>
-
 </div>
 
 <script>
 
-const lambdaURL =
-  "https://cjopy77iu4rrnlyzzgbk6uldd40hgqdf.lambda-url.us-east-1.on.aws/";
+// ─── Configuration ───────────────────────────────────────────────────────────
 
-async function generateStory() {
+const LAMBDA_URL = "https://cjopy77iu4rrnlyzzgbk6uldd40hgqdf.lambda-url.us-east-1.on.aws/";
+const API_LAMBDA_URL = ""; // Will be set when API Lambda is deployed
 
-  const text          = document.getElementById("textInput").value.trim();
-  const url           = document.getElementById("urlInput").value.trim();
-  const summaryEl     = document.getElementById("summary");
-  const summaryContent= document.getElementById("summaryContent");
-  const kurdishTextEl = document.getElementById("kurdishText");
-  const kurdishContent= document.getElementById("kurdishContent");
-  const turkishTextEl = document.getElementById("turkishText");
-  const turkishContent= document.getElementById("turkishContent");
-  const player        = document.getElementById("audioPlayer");
-  const audioContainer= document.getElementById("audioContainer");
-  const loadingEl     = document.getElementById("loading");
-  const generateBtn   = document.getElementById("generateBtn");
-  const langKurdish   = document.getElementById("langKurdish");
-  const langTurkish   = document.getElementById("langTurkish");
-  const dengbejMode   = document.getElementById("dengbejMode");
+// ─── State ───────────────────────────────────────────────────────────────────
 
-  // Validate
-  if (!text && !url) {
-    showError("Please provide either a URL or paste some text.");
+let stories = [];
+let currentIndex = -1;
+let isPlaying = false;
+let radioMode = false;
+let isProcessing = false;
+const audio = new Audio();
+audio.preload = "metadata";
+
+// ─── DOM References ──────────────────────────────────────────────────────────
+
+const container = document.getElementById("storiesContainer");
+const loadingState = document.getElementById("loadingState");
+const playPauseBtn = document.getElementById("playPauseBtn");
+const prevBtn = document.getElementById("prevBtn");
+const nextBtn = document.getElementById("nextBtn");
+const nowPlaying = document.getElementById("nowPlaying");
+const radioStatus = document.getElementById("radioStatus");
+const progressBar = document.getElementById("progressBar");
+const radioModeToggle = document.getElementById("radioModeToggle");
+
+// ─── Demo Feed Data ──────────────────────────────────────────────────────────
+// These are fetched from RSS at ingestion time and stored in DynamoDB.
+// For the demo, we fetch live RSS client-side as a fallback when the API Lambda
+// is not yet deployed.
+
+const DEMO_FEEDS = [
+  {
+    source: "BBC News",
+    rss: "https://feeds.bbci.co.uk/news/world/rss.xml",
+    cors_proxy: true
+  },
+  {
+    source: "Deutsche Welle",
+    rss: "https://rss.dw.com/rdf/rss-en-all",
+    cors_proxy: true
+  }
+];
+
+// ─── Initialization ──────────────────────────────────────────────────────────
+
+document.addEventListener("DOMContentLoaded", init);
+
+async function init() {
+  setupAudioListeners();
+  setupRadioMode();
+
+  // Try API Lambda first, fall back to client-side RSS parsing
+  if (API_LAMBDA_URL) {
+    await loadFromAPI();
+  } else {
+    await loadFromRSS();
+  }
+}
+
+// ─── Load stories from API Lambda (when deployed) ────────────────────────────
+
+async function loadFromAPI() {
+  try {
+    const response = await fetch(API_LAMBDA_URL);
+    if (!response.ok) throw new Error("API not available");
+    const data = await response.json();
+    const result = data.body ? JSON.parse(data.body) : data;
+    stories = result.articles || [];
+    renderStories();
+  } catch (e) {
+    console.warn("API Lambda not available, falling back to RSS:", e.message);
+    await loadFromRSS();
+  }
+}
+
+// ─── Load stories from RSS (demo fallback) ───────────────────────────────────
+
+async function loadFromRSS() {
+  try {
+    // Use a public CORS proxy for demo, or fetch directly if same-origin
+    const allArticles = [];
+
+    for (const feed of DEMO_FEEDS) {
+      try {
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(feed.rss)}`;
+        const response = await fetch(proxyUrl);
+        if (!response.ok) continue;
+
+        const xmlText = await response.text();
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(xmlText, "text/xml");
+
+        const items = xml.querySelectorAll("item");
+        let count = 0;
+
+        items.forEach((item) => {
+          if (count >= 5) return; // max 5 per feed
+          count++;
+
+          const title = item.querySelector("title")?.textContent || "";
+          const link = item.querySelector("link")?.textContent || "";
+          const description = item.querySelector("description")?.textContent || "";
+          const pubDate = item.querySelector("pubDate")?.textContent || "";
+
+          // Try to find image in media:thumbnail or enclosure
+          let imageUrl = "";
+          const mediaThumbnail = item.getElementsByTagName("media:thumbnail")[0];
+          const mediaContent = item.getElementsByTagName("media:content")[0];
+          const enclosure = item.querySelector("enclosure[type^='image']");
+
+          if (mediaThumbnail) {
+            imageUrl = mediaThumbnail.getAttribute("url") || "";
+          } else if (mediaContent && (mediaContent.getAttribute("medium") === "image" || mediaContent.getAttribute("type")?.startsWith("image"))) {
+            imageUrl = mediaContent.getAttribute("url") || "";
+          } else if (enclosure) {
+            imageUrl = enclosure.getAttribute("url") || "";
+          }
+
+          // Clean description (strip HTML)
+          const tempDiv = document.createElement("div");
+          tempDiv.innerHTML = description;
+          const cleanDesc = tempDiv.textContent || tempDiv.innerText || "";
+
+          allArticles.push({
+            article_id: link,
+            headline: title,
+            original_url: link,
+            source_name: feed.source,
+            pub_date: pubDate,
+            feed_description: cleanDesc.substring(0, 300),
+            image_url: imageUrl,
+            // These will be generated on-demand:
+            story_ku: null,
+            audio_url: null,
+            processing_status: "pending"
+          });
+        });
+      } catch (feedErr) {
+        console.warn(`Failed to fetch ${feed.source}:`, feedErr.message);
+      }
+    }
+
+    stories = allArticles;
+    renderStories();
+  } catch (e) {
+    console.error("Failed to load stories:", e);
+    container.innerHTML = `
+      <div class="empty-state">
+        <p>Nûçe nehatin barkirin — Could not load stories</p>
+        <p style="font-size:13px;color:var(--text-muted)">Check your connection and refresh the page.</p>
+      </div>
+    `;
+  }
+}
+
+// ─── Render Stories ──────────────────────────────────────────────────────────
+
+function renderStories() {
+  if (stories.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <p>Hêj nûçe tune ne — No stories yet</p>
+        <a href="generator.html" class="generate-btn">Amûra Çîrokê — Story Generator</a>
+      </div>
+    `;
     return;
   }
 
-  if (text && text.length < 50 && !url) {
-    showError("Please provide at least 50 characters of text.");
+  container.innerHTML = stories.map((story, index) => `
+    <article class="story-card" id="story-${index}" data-index="${index}">
+      <div class="story-top">
+        ${story.image_url
+          ? `<img class="story-thumbnail" src="${story.image_url}" alt="" loading="lazy" onerror="this.outerHTML='<div class=story-thumbnail-placeholder>📰</div>'">`
+          : `<div class="story-thumbnail-placeholder">📰</div>`
+        }
+        <div class="story-body">
+          <div class="story-source">${escapeHtml(story.source_name)}</div>
+          <h2 class="story-title">${escapeHtml(story.headline)}</h2>
+          <p class="story-context">${escapeHtml(story.feed_description || "")}</p>
+          <div class="story-footer">
+            <button class="play-btn" onclick="playStory(${index})" id="playBtn-${index}">
+              ▶ Guhdarî bike
+            </button>
+            ${story.original_url ? `<a class="story-link" href="${escapeHtml(story.original_url)}" target="_blank" rel="noopener">Çavkanî ↗</a>` : ""}
+            ${story.pub_date ? `<span class="story-date">${formatDate(story.pub_date)}</span>` : ""}
+          </div>
+        </div>
+      </div>
+    </article>
+  `).join("");
+
+  // Enable radio controls
+  playPauseBtn.disabled = false;
+  nextBtn.disabled = false;
+}
+
+// ─── Play a Story ────────────────────────────────────────────────────────────
+
+async function playStory(index) {
+  if (isProcessing) return;
+
+  const story = stories[index];
+  if (!story) return;
+
+  currentIndex = index;
+  highlightCard(index);
+  updateNowPlaying(story);
+
+  // If already has audio, play it directly
+  if (story.audio_url) {
+    startAudioPlayback(story.audio_url);
     return;
   }
 
-  hideError();
-
-  summaryEl.classList.remove("active");
-  kurdishTextEl.style.display = "none";
-  turkishTextEl.style.display = "none";
-  audioContainer.classList.remove("active");
-
-  loadingEl.classList.add("active");
-  generateBtn.disabled = true;
-  generateBtn.textContent = "Generating...";
-
-  player.pause();
-  player.src = "";
+  // Otherwise, generate via Lambda on-demand
+  isProcessing = true;
+  radioStatus.textContent = "Çîrok tê afirandin... Generating story...";
+  setPlayBtnState(index, "loading");
 
   try {
+    const requestBody = {
+      url: story.original_url,
+      languages: ["en", "ku"],
+      dengbej_mode: true
+    };
 
-    const requestBody = {};
-    if (url) {
-      requestBody.url = url;
-    } else {
-      requestBody.text = text;
-    }
-    requestBody.languages = [
-      "en",
-      ...(langKurdish.checked ? ["ku"] : []),
-      ...(langTurkish.checked ? ["tr"] : [])
-    ];
-    requestBody.dengbej_mode = dengbejMode.checked;
-
-    const response = await fetch(lambdaURL, {
+    const response = await fetch(LAMBDA_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody)
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const data = await response.json();
-    console.log("Lambda response:", data);
-
     const result = data.body ? JSON.parse(data.body) : data;
-    const summaryText = result.summary_en || result.summary;
-    const kurdishText = result.summary_ku || result.kurdish_text;
-    const turkishText = result.summary_tr;
 
-    if (!summaryText || !result.audio_url) {
-      throw new Error("Invalid response from server");
+    // Store generated content back into our story object
+    story.audio_url = result.audio_url;
+    story.story_ku = result.summary_ku || result.kurdish_text || "";
+    story.story_en = result.summary_en || result.summary || "";
+    story.processing_status = "completed";
+
+    // Update card with Kurdish story text
+    if (story.story_ku) {
+      const contextEl = document.querySelector(`#story-${index} .story-context`);
+      if (contextEl) {
+        contextEl.textContent = story.story_ku;
+        contextEl.style.webkitLineClamp = "none";
+      }
     }
 
-    // English summary
-    summaryContent.textContent = summaryText;
-    summaryEl.classList.add("active");
-
-    // Kurdish translation
-    if (kurdishText) {
-      kurdishContent.textContent = kurdishText;
-      kurdishTextEl.style.display = "block";
-    }
-
-    // Turkish translation
-    if (turkishText) {
-      turkishContent.textContent = turkishText;
-      turkishTextEl.style.display = "block";
-    }
-
-    // Audio
-    player.src = result.audio_url;
-    audioContainer.classList.add("active");
-
-    player.addEventListener("loadedmetadata", () => console.log("Audio loaded"), { once: true });
-    player.addEventListener("error", () => showError("Audio failed to load. Try again in a few seconds."), { once: true });
-
-    player.load();
-
-    try {
-      await player.play();
-    } catch (e) {
-      showError("Audio ready. Click play to listen to the English narration.", "info");
-    }
-
+    startAudioPlayback(story.audio_url);
   } catch (error) {
-
-    console.error(error);
-    showError(`Error generating story: ${error.message}. Please check your connection and try again.`);
-
+    console.error("Story generation failed:", error);
+    radioStatus.textContent = "Çewtî — Error generating story";
+    setPlayBtnState(index, "error");
   } finally {
-
-    loadingEl.classList.remove("active");
-    generateBtn.disabled = false;
-    generateBtn.textContent = "Generate Story";
-
-  }
-
-}
-
-function showError(message, type = "error") {
-  const el = document.getElementById("error");
-  el.textContent = message;
-  el.classList.add("active");
-  if (type === "info") {
-    el.style.background = "#eef4fd";
-    el.style.borderLeftColor = "#2a7ae2";
-    el.style.color = "#1a4a8a";
-  } else {
-    el.style.background = "#fff5f5";
-    el.style.borderLeftColor = "#e53935";
-    el.style.color = "#b71c1c";
+    isProcessing = false;
   }
 }
 
-function hideError() {
-  const el = document.getElementById("error");
-  el.classList.remove("active");
+function startAudioPlayback(url) {
+  audio.src = url;
+  audio.load();
+  audio.play().then(() => {
+    isPlaying = true;
+    playPauseBtn.textContent = "⏸";
+    radioStatus.textContent = "Tê lêxistin — Now playing";
+    setPlayBtnState(currentIndex, "playing");
+  }).catch(() => {
+    // Autoplay blocked — user needs to tap
+    isPlaying = false;
+    playPauseBtn.textContent = "▶";
+    radioStatus.textContent = "Bitikîne play — Tap play to listen";
+    setPlayBtnState(currentIndex, "ready");
+  });
 }
 
-document.getElementById("textInput").addEventListener("keydown", function (e) {
-  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-    generateStory();
+// ─── Audio Listeners ─────────────────────────────────────────────────────────
+
+function setupAudioListeners() {
+  audio.addEventListener("timeupdate", () => {
+    if (audio.duration) {
+      const pct = (audio.currentTime / audio.duration) * 100;
+      progressBar.style.width = pct + "%";
+    }
+  });
+
+  audio.addEventListener("ended", () => {
+    isPlaying = false;
+    playPauseBtn.textContent = "▶";
+    setPlayBtnState(currentIndex, "ended");
+    progressBar.style.width = "0%";
+
+    // Radio mode: auto-advance to next story
+    if (radioMode && currentIndex < stories.length - 1) {
+      radioStatus.textContent = "Nûçeya din... Next story...";
+      setTimeout(() => playStory(currentIndex + 1), 1500);
+    } else if (radioMode) {
+      radioStatus.textContent = "Radyo qediya — Radio finished";
+    } else {
+      radioStatus.textContent = "Qediya — Finished";
+    }
+  });
+
+  audio.addEventListener("error", () => {
+    radioStatus.textContent = "Çewtî — Audio error";
+    isPlaying = false;
+    playPauseBtn.textContent = "▶";
+  });
+
+  // Play/Pause button
+  playPauseBtn.addEventListener("click", () => {
+    if (!audio.src || audio.src === "") {
+      // Start from beginning
+      if (stories.length > 0) playStory(0);
+      return;
+    }
+
+    if (isPlaying) {
+      audio.pause();
+      isPlaying = false;
+      playPauseBtn.textContent = "▶";
+      radioStatus.textContent = "Rawestî — Paused";
+    } else {
+      audio.play().then(() => {
+        isPlaying = true;
+        playPauseBtn.textContent = "⏸";
+        radioStatus.textContent = "Tê lêxistin — Now playing";
+      }).catch(() => {});
+    }
+  });
+
+  // Next/Prev buttons
+  nextBtn.addEventListener("click", () => {
+    if (currentIndex < stories.length - 1) {
+      playStory(currentIndex + 1);
+    }
+  });
+
+  prevBtn.addEventListener("click", () => {
+    if (currentIndex > 0) {
+      playStory(currentIndex - 1);
+    }
+  });
+}
+
+// ─── Radio Mode ──────────────────────────────────────────────────────────────
+
+function setupRadioMode() {
+  radioModeToggle.addEventListener("click", () => {
+    radioMode = !radioMode;
+    radioModeToggle.classList.toggle("active", radioMode);
+
+    if (radioMode) {
+      radioStatus.textContent = "Moda radyoyê çalak e — Radio mode on";
+      // If nothing is playing, start from the top
+      if (currentIndex === -1 && stories.length > 0) {
+        playStory(0);
+      }
+    } else {
+      radioStatus.textContent = "Moda radyoyê neçalak e — Radio mode off";
+    }
+  });
+}
+
+// ─── UI Helpers ──────────────────────────────────────────────────────────────
+
+function highlightCard(index) {
+  document.querySelectorAll(".story-card").forEach(c => c.classList.remove("playing"));
+  const card = document.getElementById(`story-${index}`);
+  if (card) card.classList.add("playing");
+  prevBtn.disabled = index <= 0;
+  nextBtn.disabled = index >= stories.length - 1;
+}
+
+function updateNowPlaying(story) {
+  nowPlaying.textContent = story.headline;
+}
+
+function setPlayBtnState(index, state) {
+  // Reset all play buttons
+  document.querySelectorAll(".play-btn").forEach(btn => {
+    btn.classList.remove("active");
+    btn.textContent = "▶ Guhdarî bike";
+  });
+
+  const btn = document.getElementById(`playBtn-${index}`);
+  if (!btn) return;
+
+  switch (state) {
+    case "loading":
+      btn.textContent = "⏳ Tê afirandin...";
+      break;
+    case "playing":
+      btn.classList.add("active");
+      btn.textContent = "🔊 Tê lêxistin";
+      break;
+    case "ready":
+      btn.textContent = "▶ Guhdarî bike";
+      break;
+    case "ended":
+      btn.textContent = "↺ Dîsa bilêxe";
+      break;
+    case "error":
+      btn.textContent = "⚠ Çewtî";
+      break;
   }
-});
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+    if (diffHours < 1) return "Niha — Just now";
+    if (diffHours < 24) return `${diffHours} demjimêr berê`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return "Duh — Yesterday";
+    if (diffDays < 7) return `${diffDays} roj berê`;
+    return date.toLocaleDateString("ku", { month: "short", day: "numeric" });
+  } catch {
+    return "";
+  }
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
 
 </script>
 

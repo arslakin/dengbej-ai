@@ -6,11 +6,28 @@ Terraform configuration for deploying the complete Dengbej AI infrastructure on 
 
 This Terraform configuration creates:
 
-- **S3 Bucket** - Audio file storage with public read access
-- **Lambda Function** - Story generation backend
-- **IAM Role & Policies** - Permissions for Lambda to access Bedrock, Polly, and S3
-- **Lambda Function URL** - Public HTTPS endpoint with CORS
-- **CloudWatch Log Group** - Lambda execution logs
+### Core Story Generator
+- **S3 Bucket** — Audio file storage with public read access
+- **Lambda: dengbej-summary** — Story generation backend (Bedrock + Polly + S3)
+- **Lambda Function URL** — Public HTTPS endpoint with CORS
+- **IAM Role & Policies** — Permissions for Bedrock, Polly, S3
+
+### News Ingestion Pipeline
+- **DynamoDB Table: dengbej-articles** — Article metadata storage
+- **Lambda: dengbej-ai-news-ingester** — RSS feed fetcher (BBC, DW, Al Jazeera)
+- **EventBridge Rule** — Triggers ingestion every 6 hours
+- **Lambda Layer** — feedparser dependency
+
+### Article Processor
+- **Lambda: dengbej-ai-article-processor** — Processes pending articles through Bedrock (Kurdish story) + Polly (audio), uploads to S3, updates DynamoDB
+- **EventBridge Rule** — Triggers 30 min after ingestion (cron offset)
+
+### API Lambda
+- **Lambda: dengbej-ai-api** — Read-only API returning processed articles for the frontend
+- **Lambda Function URL** — Public GET endpoint with CORS
+
+### Shared
+- **CloudWatch Log Groups** — For all Lambdas (14-day retention)
 
 ## Prerequisites
 
