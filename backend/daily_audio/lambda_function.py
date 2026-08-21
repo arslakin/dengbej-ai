@@ -1,21 +1,21 @@
 """
-Dengbej AI — Daily Audio Script Generator
+Dengbej AI — Daily Audio Script + Narration Generator
 
-Generates ONE coherent Kurmanji Kurdish broadcast script from Today's 5.
-Does NOT generate audio — TTS provider to be connected separately.
+Generates a coherent Kurmanji Kurdish broadcast script from Today's 5,
+then synthesizes an English narration via Amazon Polly and uploads to S3.
 
 Pipeline:
   1. Retrieve latest processed Today's 5 briefing
-  2. Check idempotency (skip if script already exists)
+  2. Check idempotency (skip if script + audio already exist)
   3. Generate Kurdish broadcast script via Bedrock
-  4. Store script + metadata in DynamoDB
-  5. (Future) Pass script to TTS provider
+  4. Generate short English narration script via Bedrock
+  5. Synthesize English audio via Amazon Polly (neural)
+  6. Upload audio to S3
+  7. Store script + audio URL + metadata in DynamoDB
 
-The broadcast script is NOT a concatenation of summaries.
-It is a coherent radio-style program with:
-  - Opening greeting
-  - Natural transitions between stories
-  - Closing
+The Kurdish script is the primary editorial product (displayed as text).
+The English audio narration provides an accessible listening experience
+until a Kurdish TTS provider becomes available.
 """
 
 import json
@@ -31,12 +31,16 @@ from botocore.exceptions import ClientError
 BRIEFINGS_TABLE = os.environ.get("BRIEFINGS_TABLE", "dengbej-briefings")
 PROGRAMS_TABLE = os.environ.get("PROGRAMS_TABLE", "dengbej-programs")
 MODEL_ID = os.environ.get("MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
+S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "dengbej-audio")
+TTS_ENABLED = os.environ.get("TTS_ENABLED", "true").lower() == "true"
 
 # AWS Clients
 dynamodb = boto3.resource("dynamodb")
 briefings_table = dynamodb.Table(BRIEFINGS_TABLE)
 programs_table = dynamodb.Table(PROGRAMS_TABLE)
 bedrock_runtime = boto3.client("bedrock-runtime")
+polly_client = boto3.client("polly")
+s3_client = boto3.client("s3")
 
 
 class Telemetry:
@@ -108,7 +112,19 @@ def handle_today_script(target_date, force, telemetry):
         return {"statusCode": 500, "body": {"error": "Script generation failed", "telemetry": telemetry.to_dict()}}
 
     telemetry.script_chars = len(script)
-    store_script(briefing, script, target_date, telemetry)
+
+    # Generate English audio narration via Polly
+    audio_url = None
+    if TTS_ENABLED:
+        try:
+            narration_en = generate_english_narration(processed_stories, target_date, telemetry)
+            if narration_en:
+                audio_url = synthesize_and_upload(narration_en, f"daily/{target_date}")
+                print(f"Audio uploaded: {audio_url}")
+        except Exception as e:
+            print(f"Audio generation failed (non-fatal): {e}")
+
+    store_script(briefing, script, target_date, telemetry, audio_url=audio_url)
 
     telemetry.finish()
     print(f"Telemetry: {json.dumps(telemetry.to_dict())}")
@@ -118,6 +134,7 @@ def handle_today_script(target_date, force, telemetry):
         "briefing_date": target_date,
         "script_length": len(script),
         "story_count": len(processed_stories),
+        "audio_url": audio_url,
         "telemetry": telemetry.to_dict(),
     }}
 
@@ -171,8 +188,19 @@ def handle_program_script(program_id, target_date, force, telemetry):
 
     telemetry.script_chars = len(script)
 
+    # Generate English audio narration via Polly
+    audio_url = None
+    if TTS_ENABLED:
+        try:
+            narration_en = generate_program_narration_en(stories, program_id, target_date, telemetry)
+            if narration_en:
+                audio_url = synthesize_and_upload(narration_en, f"programs/{program_id}/{target_date}")
+                print(f"Program audio uploaded: {audio_url}")
+        except Exception as e:
+            print(f"Program audio generation failed (non-fatal): {e}")
+
     # Store script back in programs table
-    store_program_script(program_id, target_date, program.get("briefing_date", target_date), script, telemetry)
+    store_program_script(program_id, target_date, program.get("briefing_date", target_date), script, telemetry, audio_url=audio_url)
 
     telemetry.finish()
     print(f"Telemetry: {json.dumps(telemetry.to_dict())}")
@@ -183,6 +211,7 @@ def handle_program_script(program_id, target_date, force, telemetry):
         "briefing_date": target_date,
         "script_length": len(script),
         "story_count": len(stories),
+        "audio_url": audio_url,
         "telemetry": telemetry.to_dict(),
     }}
 
@@ -289,25 +318,32 @@ KURDISH BROADCAST SCRIPT:"""
         return None
 
 
-def store_program_script(program_id, date_str, briefing_date, script, telemetry):
+def store_program_script(program_id, date_str, briefing_date, script, telemetry, audio_url=None):
     """Store generated script in the programs table."""
     try:
         now_iso = datetime.now(timezone.utc).isoformat()
+        update_expr = "SET script_ku = :script, script_meta = :meta"
+        expr_values = {
+            ":script": script,
+            ":meta": {
+                "script_generated_at": now_iso,
+                "model_id": MODEL_ID,
+                "script_chars": len(script),
+                "bedrock_input_tokens": telemetry.bedrock_input_tokens,
+                "bedrock_output_tokens": telemetry.bedrock_output_tokens,
+            },
+        }
+
+        if audio_url:
+            update_expr += ", audio_url = :audio_url"
+            expr_values[":audio_url"] = audio_url
+
         programs_table.update_item(
             Key={"program_id": program_id, "briefing_date": briefing_date},
-            UpdateExpression="SET script_ku = :script, script_meta = :meta",
-            ExpressionAttributeValues={
-                ":script": script,
-                ":meta": {
-                    "script_generated_at": now_iso,
-                    "model_id": MODEL_ID,
-                    "script_chars": len(script),
-                    "bedrock_input_tokens": telemetry.bedrock_input_tokens,
-                    "bedrock_output_tokens": telemetry.bedrock_output_tokens,
-                },
-            },
+            UpdateExpression=update_expr,
+            ExpressionAttributeValues=expr_values,
         )
-        print(f"Program script stored: {program_id} ({len(script)} chars)")
+        print(f"Program script stored: {program_id} ({len(script)} chars, audio={'yes' if audio_url else 'no'})")
     except ClientError as e:
         print(f"Failed to store program script: {e}")
         raise
@@ -398,7 +434,7 @@ KURDISH BROADCAST SCRIPT:"""
         return None
 
 
-def store_script(briefing, script, date_str, telemetry):
+def store_script(briefing, script, date_str, telemetry, audio_url=None):
     """Store the broadcast script and metadata in the briefing record."""
     try:
         generated_at = briefing.get("generated_at", "")
@@ -413,16 +449,16 @@ def store_script(briefing, script, date_str, telemetry):
                     "script_generated_at": now_iso,
                     "model_id": MODEL_ID,
                     "script_chars": len(script),
-                    "tts_status": "pending",
-                    "tts_provider": None,
-                    "audio_url": None,
+                    "tts_status": "completed" if audio_url else "pending",
+                    "tts_provider": "polly-en" if audio_url else None,
+                    "audio_url": audio_url,
                     "audio_duration_seconds": None,
                     "bedrock_input_tokens": telemetry.bedrock_input_tokens,
                     "bedrock_output_tokens": telemetry.bedrock_output_tokens,
                 },
             },
         )
-        print(f"Script stored for {date_str} ({len(script)} chars)")
+        print(f"Script stored for {date_str} ({len(script)} chars, audio={'yes' if audio_url else 'no'})")
     except ClientError as e:
         print(f"Failed to store script: {e}")
         raise
@@ -451,3 +487,112 @@ def invoke_bedrock(prompt, max_tokens=3000, telemetry=None):
         telemetry.bedrock_output_tokens += usage.get("output_tokens", 0)
 
     return response_body["content"][0]["text"].strip()
+
+
+# ─── English Narration Generation ────────────────────────────────────────────
+
+def generate_english_narration(stories, date_str, telemetry):
+    """Generate a concise English narration for Polly synthesis from Today's 5."""
+    story_blocks = []
+    for i, story in enumerate(stories, 1):
+        summary = story.get("summary_en", "")
+        headline = story.get("headline", "")
+        if summary:
+            story_blocks.append(f"Story {i}: {headline}\n{summary}")
+        else:
+            story_blocks.append(f"Story {i}: {headline}")
+
+    stories_text = "\n\n".join(story_blocks)
+
+    prompt = f"""Write a concise English radio news briefing (90-120 seconds when read aloud) from these stories.
+
+Structure:
+- Opening: "Good day. This is Dengbej, your daily news briefing for {date_str}."
+- Cover each story in 2-3 clear sentences. Use natural spoken English.
+- Closing: "That's all for today's Dengbej briefing. See you tomorrow."
+
+Rules:
+- Write ONLY spoken text — no labels, no formatting
+- Keep total length under 250 words
+- Be factual, concise, and natural
+
+STORIES:
+
+{stories_text}
+
+ENGLISH NARRATION:"""
+
+    try:
+        result = invoke_bedrock(prompt, max_tokens=600, telemetry=telemetry)
+        return result.strip() if result else None
+    except Exception as e:
+        print(f"English narration generation failed: {e}")
+        return None
+
+
+def generate_program_narration_en(stories, program_id, date_str, telemetry):
+    """Generate a short English narration for a topic program."""
+    story_blocks = []
+    for i, story in enumerate(stories, 1):
+        headline = story.get("headline", "")
+        desc = story.get("feed_description", "")
+        story_blocks.append(f"Story {i}: {headline}\n{desc[:200]}")
+
+    stories_text = "\n\n".join(story_blocks)
+
+    prompt = f"""Write a short English radio news segment (60-90 seconds when read aloud) about the {program_id} program.
+
+Structure:
+- Opening: "This is Dengbej with your {program_id.replace('-', ' ')} update."
+- Cover the stories concisely in 2-3 sentences each.
+- Closing: "That's your {program_id.replace('-', ' ')} update from Dengbej."
+
+Rules:
+- Write ONLY spoken text — no labels, no formatting
+- Keep total length under 200 words
+- Be factual and natural
+
+STORIES:
+
+{stories_text}
+
+ENGLISH NARRATION:"""
+
+    try:
+        result = invoke_bedrock(prompt, max_tokens=500, telemetry=telemetry)
+        return result.strip() if result else None
+    except Exception as e:
+        print(f"Program narration generation failed: {e}")
+        return None
+
+
+# ─── Polly TTS + S3 Upload ───────────────────────────────────────────────────
+
+def synthesize_and_upload(text, key_prefix):
+    """
+    Synthesize text to speech via Polly (English, neural) and upload to S3.
+    Returns the public S3 URL.
+    """
+    # Polly neural has a 3000 char limit per request
+    if len(text) > 2900:
+        text = text[:2900] + "."
+
+    response = polly_client.synthesize_speech(
+        Text=text,
+        OutputFormat="mp3",
+        VoiceId="Joanna",
+        Engine="neural",
+    )
+
+    audio_data = response["AudioStream"].read()
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    s3_key = f"{key_prefix}_{timestamp}.mp3"
+
+    s3_client.put_object(
+        Bucket=S3_BUCKET,
+        Key=s3_key,
+        Body=audio_data,
+        ContentType="audio/mpeg",
+    )
+
+    return f"https://{S3_BUCKET}.s3.amazonaws.com/{s3_key}"

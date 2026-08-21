@@ -11,7 +11,7 @@ This Lambda only READS from dengbej-briefings.
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
 import boto3
@@ -62,20 +62,18 @@ def lambda_handler(event, context):
 
 
 def handle_today():
-    """Return today's briefing (or most recent available)."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    briefing = get_processed_briefing(today)
+    """Return today's briefing (or most recent available within the last 7 days)."""
+    now = datetime.now(timezone.utc)
 
-    if not briefing:
-        # Try yesterday if today's isn't ready yet
-        from datetime import timedelta
-        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-        briefing = get_processed_briefing(yesterday)
+    # Search backwards up to 7 days for the most recent available briefing
+    for days_back in range(8):
+        date_str = (now - timedelta(days=days_back)).strftime("%Y-%m-%d")
+        briefing = get_processed_briefing(date_str)
+        if briefing:
+            return cors_response(200, format_briefing(briefing))
 
-    if not briefing:
-        return cors_response(404, {"error": "No briefing available", "date": today})
-
-    return cors_response(200, format_briefing(briefing))
+    today = now.strftime("%Y-%m-%d")
+    return cors_response(404, {"error": "No briefing available", "date": today})
 
 
 def handle_date(date_str):
@@ -88,11 +86,11 @@ def handle_date(date_str):
 
 def handle_program(program_id):
     """Return latest program briefing."""
-    from datetime import timedelta
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    # Try today, then yesterday
-    for date in [today, (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")]:
+    # Try today, then yesterday, then up to 7 days back
+    for days_back in range(8):
+        date = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
         try:
             response = programs_table_resource.get_item(
                 Key={"program_id": program_id, "briefing_date": date}

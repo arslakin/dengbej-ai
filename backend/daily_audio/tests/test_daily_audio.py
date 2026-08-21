@@ -237,7 +237,8 @@ def test_forced_regeneration(mock_get, mock_bedrock, mock_store):
     mock_bedrock.return_value = "New regenerated script content."
     mock_store.return_value = None
 
-    result = lambda_handler({"date": "2026-08-08", "force": True}, None)
+    with patch("lambda_function.TTS_ENABLED", False):
+        result = lambda_handler({"date": "2026-08-08", "force": True}, None)
 
     assert result["statusCode"] == 200
     assert result["body"]["status"] == "generated"
@@ -433,7 +434,8 @@ def test_program_multi_story(mock_bedrock, mock_programs):
     }}
     mock_programs.update_item.return_value = {}
 
-    result = lambda_handler({"program_id": "bakur", "date": "2026-08-11"}, None)
+    with patch("lambda_function.TTS_ENABLED", False):
+        result = lambda_handler({"program_id": "bakur", "date": "2026-08-11"}, None)
 
     assert result["statusCode"] == 200
     assert result["body"]["status"] == "generated"

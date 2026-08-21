@@ -1,6 +1,6 @@
-# Dengbej AI — Daily Audio Script Generator
-# Generates Kurdish broadcast script from Today's 5
-# NO Polly. NO S3. TTS deferred until Kurdish provider available.
+# Dengbej AI — Daily Audio Script + Narration Generator
+# Generates Kurdish broadcast script from Today's 5, then synthesizes
+# English narration via Polly and uploads to S3.
 
 resource "aws_iam_role" "daily_audio_role" {
   name = "${var.project_name}-daily-audio-role"
@@ -43,6 +43,16 @@ resource "aws_iam_role_policy" "daily_audio_policy" {
           "arn:aws:bedrock:${var.aws_region}:*:inference-profile/${var.bedrock_model_id}",
           "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0"
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = ["polly:SynthesizeSpeech"]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = ["s3:PutObject"]
+        Resource = "${aws_s3_bucket.audio_storage.arn}/*"
       }
     ]
   })
@@ -69,6 +79,8 @@ resource "aws_lambda_function" "daily_audio" {
       BRIEFINGS_TABLE = aws_dynamodb_table.briefings.name
       PROGRAMS_TABLE  = aws_dynamodb_table.programs.name
       MODEL_ID        = var.bedrock_model_id
+      S3_BUCKET_NAME  = aws_s3_bucket.audio_storage.id
+      TTS_ENABLED     = "true"
     }
   }
   tags = { Name = "Dengbej AI Daily Audio", Project = "dengbej-ai" }

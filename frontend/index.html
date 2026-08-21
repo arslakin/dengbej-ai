@@ -243,6 +243,40 @@
       .radio-card-action { flex-direction: column; align-items: stretch; gap: 0.75rem; }
       .radio-card-script { font-size: 0.88rem; padding: 0.75rem; }
     }
+    /* ── Persistent Audio Player Bar ── */
+    .player-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
+      background: var(--bg-card); border-top: 1px solid var(--border);
+      padding: 0.6rem 0; transform: translateY(100%);
+      transition: transform 0.3s ease;
+    }
+    .player-bar.visible { transform: translateY(0); }
+    .player-inner {
+      display: flex; align-items: center; gap: 1rem;
+    }
+    .player-controls { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
+    .player-btn {
+      background: none; border: 1px solid var(--border); border-radius: 50%;
+      width: 32px; height: 32px; font-size: 0.8rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-secondary); transition: border-color 0.2s, color 0.2s;
+    }
+    .player-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .player-btn-main { width: 38px; height: 38px; font-size: 1rem; background: var(--accent); color: #fff; border-color: var(--accent); }
+    .player-btn-main:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
+    .player-info { flex: 1; min-width: 0; }
+    .player-title {
+      font-family: Georgia, serif; font-size: 0.85rem; font-weight: 600;
+      color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      display: block; margin-bottom: 0.3rem;
+    }
+    .player-progress-bar { width: 100%; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .player-progress { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s linear; }
+    body { padding-bottom: 70px; }
+    @media (max-width: 599px) {
+      .player-inner { gap: 0.6rem; }
+      .player-title { font-size: 0.78rem; }
+    }
   </style>
 </head>
 <body>
@@ -316,6 +350,24 @@
       <p class="footer-tagline">Inspired by the dengbêj tradition · Built on AWS</p>
     </div>
   </footer>
+
+  <!-- Audio Player Bar -->
+  <div class="player-bar" id="player-bar">
+    <div class="container">
+      <div class="player-inner">
+        <div class="player-controls">
+          <button class="player-btn" onclick="playPrevProgram()" aria-label="Previous">⏮</button>
+          <button class="player-btn player-btn-main" id="play-pause-btn" onclick="togglePlayPause()" aria-label="Play/Pause">▶</button>
+          <button class="player-btn" onclick="playNextProgram()" aria-label="Next">⏭</button>
+        </div>
+        <div class="player-info">
+          <span class="player-title" id="player-title">Dengbej</span>
+          <div class="player-progress-bar"><div class="player-progress" id="player-progress"></div></div>
+        </div>
+      </div>
+    </div>
+    <audio id="audio-player" preload="none"></audio>
+  </div>
 
   <script>
     var API_URL = "https://77khte6fwkmwi5igfme5qezzga0kcnqv.lambda-url.us-east-1.on.aws";
@@ -406,10 +458,17 @@
     function updateBejeState() {
       var bejeRow = document.querySelector(".beje-row");
       if (!bejeRow) return;
-      // Audio not available for any program currently — show placeholder text
-      bejeRow.innerHTML = '<p class="audio-placeholder">' +
-        (currentLang === "ku" ? "🎙️ Dengê Kurdî — zû tê" : "🎙️ Kurdish audio — coming soon") +
-        '</p>';
+
+      // Check if current briefing has audio
+      if (selectedProgram === "today" && briefingData && briefingData.daily_audio && briefingData.daily_audio.available && briefingData.daily_audio.url) {
+        bejeRow.innerHTML = '<button class="beje-btn" onclick="playAudio(\'' + escapeHtml(briefingData.daily_audio.url) + '\')" aria-label="' +
+          (currentLang === "ku" ? "Bibihîze" : "Listen") + '">Bêje! ▶</button>' +
+          '<span class="audio-status">' + (currentLang === "ku" ? "Dengê nûçeyan amade ye" : "News audio ready") + '</span>';
+      } else {
+        bejeRow.innerHTML = '<p class="audio-placeholder">' +
+          (currentLang === "ku" ? "🎙️ Dengê Kurdî — zû tê" : "🎙️ Kurdish audio — coming soon") +
+          '</p>';
+      }
     }
 
     function setLanguage(lang) {
@@ -571,9 +630,95 @@
     }
 
     function playAudio(url) {
-      // Future: implement audio playback
-      console.log("Audio URL:", url);
+      if (!url) return;
+      var player = document.getElementById("audio-player");
+      var playerBar = document.getElementById("player-bar");
+      var playerTitle = document.getElementById("player-title");
+      var playPauseBtn = document.getElementById("play-pause-btn");
+
+      if (!player) return;
+
+      // Show player bar
+      playerBar.classList.add("visible");
+
+      // Set title based on current program
+      var prog = PROGRAMS.find(function(p) { return p.id === selectedProgram; });
+      playerTitle.textContent = prog
+        ? (currentLang === "ku" ? prog.label_ku : prog.label_en)
+        : "Dengbej";
+
+      // If same URL, toggle play/pause
+      if (player.src === url && !player.paused) {
+        player.pause();
+        playPauseBtn.textContent = "▶";
+        return;
+      }
+
+      player.src = url;
+      player.load();
+      player.play().then(function() {
+        playPauseBtn.textContent = "⏸";
+      }).catch(function() {
+        playPauseBtn.textContent = "▶";
+      });
     }
+
+    function togglePlayPause() {
+      var player = document.getElementById("audio-player");
+      var playPauseBtn = document.getElementById("play-pause-btn");
+      if (!player || !player.src) return;
+
+      if (player.paused) {
+        player.play().then(function() { playPauseBtn.textContent = "⏸"; }).catch(function() {});
+      } else {
+        player.pause();
+        playPauseBtn.textContent = "▶";
+      }
+    }
+
+    function playNextProgram() {
+      var currentIdx = PROGRAMS.findIndex(function(p) { return p.id === selectedProgram; });
+      if (currentIdx < PROGRAMS.length - 1) {
+        var nextProg = PROGRAMS[currentIdx + 1];
+        selectedProgram = nextProg.id;
+        renderPrograms();
+        loadProgram(selectedProgram);
+      }
+    }
+
+    function playPrevProgram() {
+      var currentIdx = PROGRAMS.findIndex(function(p) { return p.id === selectedProgram; });
+      if (currentIdx > 0) {
+        var prevProg = PROGRAMS[currentIdx - 1];
+        selectedProgram = prevProg.id;
+        renderPrograms();
+        if (selectedProgram === "today") {
+          if (briefingData) renderBriefing(briefingData);
+          else loadBriefing();
+        } else {
+          loadProgram(selectedProgram);
+        }
+      }
+    }
+
+    // Auto-advance when audio ends (continuous radio mode)
+    document.addEventListener("DOMContentLoaded", function() {
+      var player = document.getElementById("audio-player");
+      if (player) {
+        player.addEventListener("ended", function() {
+          var playPauseBtn = document.getElementById("play-pause-btn");
+          if (playPauseBtn) playPauseBtn.textContent = "▶";
+          // Auto-advance to next program
+          playNextProgram();
+        });
+        player.addEventListener("timeupdate", function() {
+          var progress = document.getElementById("player-progress");
+          if (progress && player.duration) {
+            progress.style.width = (player.currentTime / player.duration * 100) + "%";
+          }
+        });
+      }
+    });
 
     setLanguage(currentLang);
     loadBriefing();

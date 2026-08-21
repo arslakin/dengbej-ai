@@ -136,8 +136,10 @@ def test_today_returns_latest_briefing():
     with patch("lambda_function.briefings_table") as mock_table:
         mock_table.query.return_value = {"Items": [briefing]}
         with patch("lambda_function.datetime") as mock_dt:
-            mock_dt.now.return_value = type("", (), {"strftime": lambda s, f: "2026-01-15"})()
-            # Use the real function with mocked table
+            from datetime import datetime as real_dt, timezone as real_tz
+            fake_now = real_dt(2026, 1, 15, 12, 0, 0, tzinfo=real_tz.utc)
+            mock_dt.now.return_value = fake_now
+            mock_dt.side_effect = lambda *a, **kw: real_dt(*a, **kw)
             response = _invoke_lambda("/news/today")
 
     assert response["statusCode"] == 200
@@ -177,7 +179,7 @@ def test_today_falls_back_to_yesterday():
 
 
 def test_today_no_briefing_available():
-    """If no briefing exists for today or yesterday, return 404."""
+    """If no briefing exists within the last 7 days, return 404."""
     with patch("lambda_function.briefings_table") as mock_table:
         mock_table.query.return_value = {"Items": []}
         response = _invoke_lambda("/news/today")
