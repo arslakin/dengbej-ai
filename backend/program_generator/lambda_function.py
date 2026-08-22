@@ -146,6 +146,9 @@ def lambda_handler(event, context):
                         programs_needing_scripts.append(pid)
                     continue
 
+            # Content changed or new — translate headlines and store updated program
+            translate_headlines_batch(selected, telemetry)
+
             # Content changed or new — store updated program
             store_program_briefing(pid, target_date, selected, content_fingerprint=fingerprint)
             results[pid] = {"status": "generated", "story_count": len(selected)}
@@ -287,6 +290,39 @@ def get_existing_program(program_id, date_str):
         return response.get("Item")
     except ClientError:
         return None
+
+
+def translate_headlines_batch(stories, telemetry):
+    """Translate all headlines in a story list to Kurdish Kurmanji in one Bedrock call."""
+    if not stories:
+        return
+
+    headlines = [s.get("headline", "") for s in stories]
+    if not any(headlines):
+        return
+
+    numbered = "\n".join(f"{i+1}. {h}" for i, h in enumerate(headlines))
+
+    prompt = f"""Translate each English headline below into Kurdish Kurmanji.
+Return ONLY a numbered list of translations — same numbering, one per line.
+Keep translations concise and faithful. Preserve proper nouns.
+
+{numbered}
+
+KURDISH TRANSLATIONS:"""
+
+    try:
+        result = invoke_bedrock(prompt, max_tokens=400, telemetry=telemetry)
+        if result:
+            lines = [l.strip() for l in result.strip().split("\n") if l.strip()]
+            for i, story in enumerate(stories):
+                if i < len(lines):
+                    # Strip leading number and punctuation (e.g., "1. " or "1) ")
+                    translation = re.sub(r"^\d+[\.\)]\s*", "", lines[i]).strip()
+                    if translation:
+                        story["headline_ku"] = translation
+    except Exception as e:
+        print(f"  Batch headline translation failed: {e}")
 
 
 def store_program_briefing(program_id, date_str, stories, content_fingerprint=""):

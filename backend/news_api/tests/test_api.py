@@ -322,7 +322,7 @@ def test_response_structure():
     # Story fields
     story = body["stories"][0]
     expected_keys = {
-        "rank", "headline", "category", "summary_en", "summary_ku",
+        "rank", "headline", "headline_ku", "category", "summary_en", "summary_ku",
         "primary_source", "supporting_sources", "published_at", "processed_at",
     }
     assert set(story.keys()) == expected_keys
@@ -401,3 +401,35 @@ if __name__ == "__main__":
     print(f"\nResults: {passed} passed, {failed} failed, {passed + failed} total")
     if failed > 0:
         sys.exit(1)
+
+
+# ─── Tests: headline_ku serialization ────────────────────────────────────────
+
+def test_headline_ku_included_in_response():
+    """API should include headline_ku field for each story."""
+    stories = [_make_story(1)]
+    stories[0]["headline_ku"] = "Sernavê nûçeyê bi Kurdî"
+    briefing = _make_briefing("2026-01-15", stories)
+
+    with patch("lambda_function.briefings_table") as mock_table:
+        mock_table.query.return_value = {"Items": [briefing]}
+        response = _invoke_lambda("/news/2026-01-15")
+
+    body = json.loads(response["body"])
+    assert body["stories"][0]["headline_ku"] == "Sernavê nûçeyê bi Kurdî"
+    assert body["stories"][0]["headline"] == "Story 1 headline"
+
+
+def test_headline_ku_none_when_missing():
+    """API should return headline_ku as None when field is absent from DynamoDB."""
+    stories = [_make_story(1)]
+    # No headline_ku field set
+    briefing = _make_briefing("2026-01-15", stories)
+
+    with patch("lambda_function.briefings_table") as mock_table:
+        mock_table.query.return_value = {"Items": [briefing]}
+        response = _invoke_lambda("/news/2026-01-15")
+
+    body = json.loads(response["body"])
+    assert body["stories"][0]["headline_ku"] is None
+    assert body["stories"][0]["headline"] == "Story 1 headline"

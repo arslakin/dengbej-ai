@@ -649,3 +649,65 @@ if __name__ == "__main__":
     print(f"\nResults: {passed} passed, {failed} failed, {passed + failed} total")
     if failed > 0:
         sys.exit(1)
+
+
+# ─── Tests: headline_ku Translation ──────────────────────────────────────────
+
+@patch("lambda_function.invoke_bedrock")
+@patch("lambda_function.fetch_source_text")
+def test_headline_ku_generated_during_processing(mock_fetch, mock_bedrock):
+    """Processed stories should include headline_ku field."""
+    mock_fetch.return_value = "Article text content about a major event."
+    # invoke_bedrock is called 3 times: summary, translation, headline translation
+    mock_bedrock.side_effect = [
+        "English summary of the story.",
+        "Kurte nûçe bi Kurdî.",
+        "Sernavê nûçeyê bi Kurdî",
+    ]
+
+    story = _make_story(headline="Major international event unfolds")
+    telemetry = Telemetry()
+    process_story(story, telemetry)
+
+    assert story["headline_ku"] == "Sernavê nûçeyê bi Kurdî"
+    assert story["headline"] == "Major international event unfolds"
+    assert story["processing_status"] == "processed"
+
+
+@patch("lambda_function.invoke_bedrock")
+@patch("lambda_function.fetch_source_text")
+def test_headline_ku_fallback_when_translation_fails(mock_fetch, mock_bedrock):
+    """If headline translation fails, headline_ku should be None and processing should continue."""
+    mock_fetch.return_value = "Article text content."
+    # summary succeeds, body translation succeeds, headline translation fails
+    mock_bedrock.side_effect = [
+        "English summary.",
+        "Kurte nûçe.",
+        Exception("Bedrock error"),
+    ]
+
+    story = _make_story(headline="Test headline")
+    telemetry = Telemetry()
+    process_story(story, telemetry)
+
+    assert story.get("headline_ku") is None
+    assert story["headline"] == "Test headline"
+    assert story["processing_status"] == "processed"  # Not blocked by headline failure
+
+
+@patch("lambda_function.invoke_bedrock")
+@patch("lambda_function.fetch_source_text")
+def test_headline_ku_strips_quotes(mock_fetch, mock_bedrock):
+    """Headline translation should strip surrounding quotes added by model."""
+    mock_fetch.return_value = "Content."
+    mock_bedrock.side_effect = [
+        "Summary.",
+        "Werger.",
+        '"Sernavê nûçeyê"',  # Model adds quotes
+    ]
+
+    story = _make_story(headline="News headline")
+    telemetry = Telemetry()
+    process_story(story, telemetry)
+
+    assert story["headline_ku"] == "Sernavê nûçeyê"

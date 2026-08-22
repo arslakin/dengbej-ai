@@ -498,7 +498,7 @@
       stories.forEach(function(story, i) {
         var rank = String(i + 1).padStart(2, "0");
         var category = story.category || "world";
-        var headline = story.headline || "";
+        var headline = currentLang === "ku" ? (story.headline_ku || story.headline || "") : (story.headline || "");
         var summary = currentLang === "ku" ? (story.summary_ku || story.summary_en) : story.summary_en;
         var source = story.primary_source ? story.primary_source.name : "";
         var sourceUrl = story.primary_source ? story.primary_source.url : "";
@@ -606,7 +606,7 @@
         stories.forEach(function(story, i) {
           var rank = String(i + 1).padStart(2, "0");
           var category = story.category || programId;
-          var headline = story.headline || "";
+          var headline = currentLang === "ku" ? (story.headline_ku || story.headline || "") : (story.headline || "");
           var summary = story.feed_description || "";
           var source = story.primary_source ? story.primary_source.name : "";
           var sourceUrl = story.primary_source ? story.primary_source.url : "";

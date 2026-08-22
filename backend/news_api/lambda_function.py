@@ -121,6 +121,7 @@ def format_program(item):
         formatted.append({
             "rank": i + 1,
             "headline": story.get("headline"),
+            "headline_ku": story.get("headline_ku"),
             "category": story.get("category"),
             "primary_source": {"name": story.get("primary_source", ""), "url": story.get("original_url", "")},
             "supporting_sources": [{"name": s.get("source_name", ""), "url": s.get("url", "")} for s in story.get("supporting_sources", [])],
@@ -194,6 +195,7 @@ def format_briefing(briefing):
         formatted_stories.append({
             "rank": story.get("rank"),
             "headline": story.get("headline"),
+            "headline_ku": story.get("headline_ku"),
             "category": story.get("category"),
             "summary_en": story.get("summary_en"),
             "summary_ku": story.get("summary_ku"),

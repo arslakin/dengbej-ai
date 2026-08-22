@@ -246,9 +246,13 @@ def process_story(story, telemetry):
     # Translate to Kurdish Kurmanji
     summary_ku = translate_to_kurdish(summary_en, telemetry)
 
+    # Translate headline to Kurdish
+    headline_ku = translate_headline_to_kurdish(headline, telemetry)
+
     # Update story
     story["summary_en"] = summary_en
     story["summary_ku"] = summary_ku if summary_ku else None
+    story["headline_ku"] = headline_ku if headline_ku else None
     story["processing_status"] = "processed" if summary_ku else "partial"
     story["processed_at"] = datetime.now(timezone.utc).isoformat()
     story["sources_used"] = sources_used
@@ -379,6 +383,38 @@ def translate_to_kurdish(summary_en, telemetry):
         return result.strip() if result else None
     except Exception as e:
         print(f"  Bedrock translation failed: {e}")
+        return None
+
+
+# ─── Bedrock: Kurdish Headline Translation ───────────────────────────────────
+
+HEADLINE_TRANSLATION_PROMPT = """Translate this English news headline into Kurdish Kurmanji.
+
+RULES:
+- Faithful, concise translation — do not editorialize or expand
+- Preserve proper nouns (people, places, organizations) in their recognized form
+- Use standard Kurmanji orthography
+- Return ONLY the translated headline — no quotes, no explanation, no formatting
+
+ENGLISH HEADLINE:
+{headline}
+
+KURDISH HEADLINE:"""
+
+
+def translate_headline_to_kurdish(headline, telemetry):
+    """Translate a single English headline to Kurdish Kurmanji."""
+    prompt = HEADLINE_TRANSLATION_PROMPT.format(headline=headline)
+
+    try:
+        result = invoke_bedrock(prompt, max_tokens=100, telemetry=telemetry)
+        if result:
+            # Clean: remove surrounding quotes if model adds them
+            cleaned = result.strip().strip('"').strip("'").strip()
+            return cleaned
+        return None
+    except Exception as e:
+        print(f"  Bedrock headline translation failed: {e}")
         return None
 
 

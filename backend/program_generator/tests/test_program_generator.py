@@ -707,3 +707,50 @@ if __name__ == "__main__":
     print(f"\nResults: {passed} passed, {failed} failed, {passed + failed} total")
     if failed > 0:
         sys.exit(1)
+
+
+# ─── Tests: headline_ku in program stories ───────────────────────────────────
+
+@patch("lambda_function.invoke_bedrock")
+def test_translate_headlines_batch_populates_headline_ku(mock_bedrock):
+    """translate_headlines_batch should set headline_ku on each story."""
+    from lambda_function import translate_headlines_batch
+    from lambda_function import Telemetry
+
+    mock_bedrock.return_value = "1. Sernavê yekem\n2. Sernavê duyem\n3. Sernavê sêyem"
+    stories = [
+        {"headline": "First headline", "category": "world"},
+        {"headline": "Second headline", "category": "world"},
+        {"headline": "Third headline", "category": "world"},
+    ]
+    telemetry = Telemetry()
+    translate_headlines_batch(stories, telemetry)
+
+    assert stories[0]["headline_ku"] == "Sernavê yekem"
+    assert stories[1]["headline_ku"] == "Sernavê duyem"
+    assert stories[2]["headline_ku"] == "Sernavê sêyem"
+
+
+@patch("lambda_function.invoke_bedrock")
+def test_translate_headlines_batch_handles_failure(mock_bedrock):
+    """If Bedrock fails, stories should not have headline_ku added."""
+    from lambda_function import translate_headlines_batch
+    from lambda_function import Telemetry
+
+    mock_bedrock.side_effect = Exception("Bedrock unavailable")
+    stories = [{"headline": "Test", "category": "world"}]
+    telemetry = Telemetry()
+    translate_headlines_batch(stories, telemetry)
+
+    assert "headline_ku" not in stories[0]
+
+
+@patch("lambda_function.invoke_bedrock")
+def test_translate_headlines_batch_empty_list(mock_bedrock):
+    """Empty stories list should not call Bedrock."""
+    from lambda_function import translate_headlines_batch
+    from lambda_function import Telemetry
+
+    telemetry = Telemetry()
+    translate_headlines_batch([], telemetry)
+    mock_bedrock.assert_not_called()
