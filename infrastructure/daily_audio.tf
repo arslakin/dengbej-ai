@@ -45,13 +45,13 @@ resource "aws_iam_role_policy" "daily_audio_policy" {
         ]
       },
       {
-        Effect = "Allow"
-        Action = ["polly:SynthesizeSpeech"]
+        Effect   = "Allow"
+        Action   = ["polly:SynthesizeSpeech"]
         Resource = "*"
       },
       {
-        Effect = "Allow"
-        Action = ["s3:PutObject"]
+        Effect   = "Allow"
+        Action   = ["s3:PutObject"]
         Resource = "${aws_s3_bucket.audio_storage.arn}/*"
       }
     ]
@@ -90,4 +90,31 @@ resource "aws_cloudwatch_log_group" "daily_audio_logs" {
   name              = "/aws/lambda/${var.daily_audio_function_name}"
   retention_in_days = 14
   tags              = { Name = "Dengbej AI Daily Audio Logs", Project = "dengbej-ai" }
+}
+
+# ─── EventBridge Schedule (20 min after curation, 5 min after processor) ─────
+# Generates Kurdish script + English audio narration for Today's 5.
+
+resource "aws_cloudwatch_event_rule" "daily_audio_schedule" {
+  name                = "${var.project_name}-daily-audio-schedule"
+  description         = "Generate audio scripts + narration after processing"
+  schedule_expression = "cron(20 6,18 * * ? *)"
+
+  tags = {
+    Name    = "Dengbej AI Daily Audio Schedule"
+    Project = "dengbej-ai"
+  }
+}
+
+resource "aws_cloudwatch_event_target" "daily_audio_target" {
+  rule = aws_cloudwatch_event_rule.daily_audio_schedule.name
+  arn  = aws_lambda_function.daily_audio.arn
+}
+
+resource "aws_lambda_permission" "allow_eventbridge_daily_audio" {
+  statement_id  = "AllowEventBridgeDailyAudio"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.daily_audio.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.daily_audio_schedule.arn
 }

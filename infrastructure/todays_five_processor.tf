@@ -12,7 +12,8 @@
 #   - Bedrock: InvokeModel on inference profile + foundation model
 #   - CloudWatch: logs
 #
-# NO Polly, NO S3, NO EventBridge schedule (manual invocation only)
+# NO Polly, NO S3
+# EventBridge schedule added to automate processing after curation.
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ─── IAM Role for Processor Lambda ───────────────────────────────────────────
@@ -155,4 +156,32 @@ resource "aws_cloudwatch_log_group" "processor_logs" {
     Name    = "Dengbej AI Processor Logs"
     Project = "dengbej-ai"
   }
+}
+
+# ─── EventBridge Schedule (15 min after curation) ────────────────────────────
+# Curator runs at 06:00/18:00; processor runs at 06:15/18:15 to summarize
+# and translate the curated stories.
+
+resource "aws_cloudwatch_event_rule" "processor_schedule" {
+  name                = "${var.project_name}-processor-schedule"
+  description         = "Trigger Today's 5 processor after curation"
+  schedule_expression = "cron(15 6,18 * * ? *)"
+
+  tags = {
+    Name    = "Dengbej AI Processor Schedule"
+    Project = "dengbej-ai"
+  }
+}
+
+resource "aws_cloudwatch_event_target" "processor_target" {
+  rule = aws_cloudwatch_event_rule.processor_schedule.name
+  arn  = aws_lambda_function.processor.arn
+}
+
+resource "aws_lambda_permission" "allow_eventbridge_processor" {
+  statement_id  = "AllowEventBridgeProcessor"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.processor.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.processor_schedule.arn
 }

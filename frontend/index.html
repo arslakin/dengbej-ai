@@ -309,7 +309,7 @@
       <p class="ci-bejim" id="ci-bejim-label">Çi bêjim?</p>
       <div class="program-choices" role="radiogroup" aria-labelledby="ci-bejim-label"></div>
       <div class="beje-row">
-        <p class="audio-placeholder">🎙️ Kurdish audio — coming soon</p>
+        <p class="audio-placeholder">🎙️ English narration — coming soon</p>
       </div>
     </section>
 
@@ -463,10 +463,10 @@
       if (selectedProgram === "today" && briefingData && briefingData.daily_audio && briefingData.daily_audio.available && briefingData.daily_audio.url) {
         bejeRow.innerHTML = '<button class="beje-btn" onclick="playAudio(\'' + escapeHtml(briefingData.daily_audio.url) + '\')" aria-label="' +
           (currentLang === "ku" ? "Bibihîze" : "Listen") + '">Bêje! ▶</button>' +
-          '<span class="audio-status">' + (currentLang === "ku" ? "Dengê nûçeyan amade ye" : "News audio ready") + '</span>';
+          '<span class="audio-status">' + (currentLang === "ku" ? "Deng bi Îngilîzî amade ye" : "English narration ready") + '</span>';
       } else {
         bejeRow.innerHTML = '<p class="audio-placeholder">' +
-          (currentLang === "ku" ? "🎙️ Dengê Kurdî — zû tê" : "🎙️ Kurdish audio — coming soon") +
+          (currentLang === "ku" ? "🎙️ Deng bi Îngilîzî — zû tê" : "🎙️ English narration — coming soon") +
           '</p>';
       }
     }
@@ -586,10 +586,10 @@
         html += '<div class="radio-card-action">';
         if (audioAvailable) {
           html += '<button class="beje-btn" onclick="playAudio(\'' + escapeHtml(data.audio.url) + '\')" aria-label="' + (currentLang === "ku" ? "Bibihîze" : "Listen") + '">Bêje! ▶</button>';
-          html += '<span class="radio-card-status">' + (currentLang === "ku" ? "Dengê Kurdî amade ye" : "Kurdish audio ready") + '</span>';
+          html += '<span class="radio-card-status">' + (currentLang === "ku" ? "Deng bi Îngilîzî amade ye" : "English narration ready") + '</span>';
         } else {
           html += '<button class="beje-btn" disabled aria-label="' + (currentLang === "ku" ? "Deng hîn amade nîne" : "Audio not yet available") + '">Bêje!</button>';
-          html += '<span class="radio-card-status">' + (currentLang === "ku" ? "Deng tê amadekirin" : "Audio coming soon") + '</span>';
+          html += '<span class="radio-card-status">' + (currentLang === "ku" ? "Deng bi Îngilîzî tê amadekirin" : "English narration coming soon") + '</span>';
         }
         html += '</div>';
 
