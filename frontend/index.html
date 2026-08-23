@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dengbej — News Worth Hearing</title>
-  <meta name="description" content="A daily briefing of five important global stories, summarized in English and Kurdish Kurmanji.">
-  <meta property="og:title" content="Dengbej — News Worth Hearing">
-  <meta property="og:description" content="Five global stories, curated daily. In English and Kurdish.">
+  <title>Dengbêj — News Worth Hearing</title>
+  <meta name="description" content="A daily briefing of important global stories, summarized in English and Kurdish Kurmanji.">
+  <meta property="og:title" content="Dengbêj — News Worth Hearing">
+  <meta property="og:description" content="Global stories, curated daily. In English and Kurdish.">
   <meta property="og:type" content="website">
   <style>
     :root {
       --text-primary: #111; --text-secondary: #444; --text-muted: #777;
-      --bg-page: #faf9f7; --bg-listen: #f5f0ea;
+      --bg-page: #faf9f7; --bg-listen: #f5f0ea; --bg-card: #fff;
       --accent: #7a3b10; --accent-hover: #5c2d0c; --accent-light: #f5ede4;
       --border: #e5e0d8; --link: #1a4a8a; --link-hover: #0d3266;
       --cat-conflict: #b71c1c; --cat-politics: #1565c0; --cat-human-rights: #6a1b9a;
@@ -24,18 +24,21 @@
       font-family: Georgia, 'Times New Roman', serif;
       background: var(--bg-page); color: var(--text-primary);
       line-height: 1.7; -webkit-font-smoothing: antialiased;
+      padding-bottom: 70px;
     }
     .container { max-width: 700px; margin: 0 auto; padding: 0 1.25rem; }
+
+    /* ── Header ── */
     header { padding: 1.5rem 0 1.25rem; border-bottom: 1px solid var(--border); }
     .header-inner { display: flex; justify-content: space-between; align-items: center; }
     .wordmark {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 1.3rem; font-weight: 700; letter-spacing: 0.18em; color: var(--text-primary);
     }
     .wordmark-link { text-decoration: none; }
     .site-nav {
       display: flex; gap: 1.25rem;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.8rem;
     }
     .site-nav a {
@@ -46,7 +49,7 @@
     .site-nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .lang-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
     .lang-toggle button {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.78rem; padding: 0.35rem 0.75rem; border: none;
       background: transparent; color: var(--text-secondary); cursor: pointer;
       transition: background 0.15s ease, color 0.15s ease;
@@ -54,24 +57,21 @@
     .lang-toggle button:hover { background: var(--accent-light); }
     .lang-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
     .lang-toggle button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+
+    /* ── Section Intro ── */
     .section-intro { padding: 2rem 0 1.5rem; }
     .section-intro h2 {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 0.4rem;
     }
     .section-intro p { font-size: 1.05rem; color: var(--text-secondary); }
     .section-intro .date {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;
     }
-    .builder-link {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.8rem; margin-top: 0.5rem;
-    }
-    .builder-link a { color: var(--accent); text-decoration: none; font-weight: 500; }
-    .builder-link a:hover { text-decoration: underline; }
-    .builder-link a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* ── Listen / Program Selector Area ── */
     .listen-area { background: var(--bg-listen); border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; }
     .ci-bejim {
       font-family: Georgia, serif; font-size: 1.2rem; font-weight: 700;
@@ -79,7 +79,7 @@
     }
     .program-choices { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; }
     .program-btn {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.8rem; padding: 0.45rem 0.9rem;
       border: 1.5px solid var(--border); border-radius: 20px;
       background: transparent; color: var(--text-secondary); cursor: pointer;
@@ -88,17 +88,7 @@
     .program-btn:hover { border-color: var(--accent); color: var(--accent); }
     .program-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .program-btn[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .program-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .beje-row { display: flex; align-items: center; gap: 1rem; }
-    .audio-status {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.75rem; color: var(--text-muted);
-    }
-    .audio-placeholder {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.85rem; color: var(--text-muted); font-style: italic;
-      padding: 0.5rem 0;
-    }
     .beje-btn {
       font-family: Georgia, serif; font-size: 1.1rem; font-weight: 700;
       padding: 0.6rem 1.4rem; background: var(--accent); color: #fff;
@@ -108,21 +98,30 @@
     .beje-btn:hover:not(:disabled) { background: var(--accent-hover); }
     .beje-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .beje-btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+    .audio-status {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.75rem; color: var(--text-muted);
+    }
+
+    /* ── Stories ── */
     .story { border-bottom: 1px solid var(--border); padding: 1.75rem 0; }
     .story:last-child { border-bottom: none; }
     .story-rank {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 1.6rem; font-weight: 700; color: var(--border); line-height: 1; margin-bottom: 0.5rem;
     }
     .story-category {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.1em; margin-bottom: 0.4rem; display: inline-block;
     }
     .story-headline { font-size: 1.5rem; font-weight: 700; line-height: 1.3; margin-bottom: 0.75rem; }
-    .story-summary { font-size: 1rem; color: var(--text-secondary); line-height: 1.75; margin-bottom: 1rem; }
+    .story-summary {
+      font-size: 1rem; color: var(--text-secondary); line-height: 1.75; margin-bottom: 1rem;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
     .story-footer {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.78rem; color: var(--text-muted);
       display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 1rem;
     }
@@ -130,39 +129,70 @@
     .story-link { color: var(--link); text-decoration: none; font-weight: 500; margin-left: auto; }
     .story-link:hover { color: var(--link-hover); text-decoration: underline; }
     .story-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* ── States ── */
     .state-container { text-align: center; padding: 4rem 1rem; }
     .state-container p {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 1.5rem;
     }
     .loading-dots::after { content: ''; animation: dots 1.5s steps(4, end) infinite; }
     @keyframes dots { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
     .retry-btn {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.85rem; padding: 0.55rem 1.4rem; background: var(--accent);
       color: #fff; border: none; border-radius: 4px; cursor: pointer;
       transition: background 0.15s ease;
     }
     .retry-btn:hover { background: var(--accent-hover); }
     .retry-btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+
+    /* ── Radio Program Card ── */
+    .radio-card {
+      background: var(--bg-listen); border-radius: 8px; padding: 1.5rem;
+      margin-bottom: 2rem; border: 1px solid var(--border);
+    }
+    .radio-card-header { margin-bottom: 1rem; }
+    .radio-card-title {
+      font-family: Georgia, serif; font-size: 1.15rem; font-weight: 700;
+      color: var(--text-primary); margin-bottom: 0.2rem;
+    }
+    .radio-card-subtitle {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.78rem; color: var(--text-muted);
+    }
+    .radio-card-action { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+    .radio-card-status {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.75rem; color: var(--text-muted);
+    }
+    .radio-card-script {
+      font-family: Georgia, serif; font-size: 0.92rem; line-height: 1.7;
+      color: var(--text-secondary); font-style: italic;
+      padding: 1rem; background: rgba(255,255,255,0.5); border-radius: 6px;
+      white-space: pre-wrap;
+    }
+    .radio-card-empty {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.9rem; color: var(--text-muted); text-align: center; padding: 1.5rem 0;
+    }
+    .radio-card-empty .empty-ku {
+      font-family: Georgia, serif; font-size: 1rem; color: var(--text-secondary); margin-bottom: 0.4rem;
+    }
+
+    /* ── About Section ── */
     .about-section { border-top: 1px solid var(--border); padding: 2.5rem 0 2rem; }
     .about-section h2 {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 0.6rem;
     }
     .about-section p { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.7; max-width: 540px; }
-    .cta-section {
-      border-top: 1px solid var(--border); padding: 1.75rem 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.85rem; color: var(--text-muted);
-    }
-    .cta-section a { color: var(--link); text-decoration: none; font-weight: 500; }
-    .cta-section a:hover { color: var(--link-hover); text-decoration: underline; }
-    .cta-section a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* ── Footer ── */
     footer {
       border-top: 1px solid var(--border); padding: 1.75rem 0 3rem;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 0.75rem; color: var(--text-muted); text-align: center; line-height: 1.8;
     }
     .footer-nav {
@@ -182,78 +212,16 @@
       font-size: 0.68rem; color: var(--text-secondary); background: var(--bg-page);
     }
     .footer-tagline { color: var(--text-muted); font-style: italic; }
-    @media (max-width: 599px) {
-      .site-nav { display: none; }
-      .story-headline { font-size: 1.35rem; }
-      .story-rank { font-size: 1.4rem; }
-      .listen-area { padding: 1.25rem; }
-      .story-link { margin-left: 0; }
-      .ci-bejim { font-size: 1.1rem; }
-      .program-choices { gap: 0.4rem; }
-      .program-btn { font-size: 0.75rem; padding: 0.4rem 0.75rem; }
-      .beje-row { flex-direction: column; align-items: stretch; gap: 0.75rem; }
-      .beje-btn { width: 100%; }
-    }
-    @media (min-width: 600px) and (max-width: 899px) { .container { padding: 0 2rem; } }
-    @media (min-width: 900px) { .story-headline { font-size: 1.6rem; } header { padding: 2rem 0 1.5rem; } }
-    @media (prefers-reduced-motion: reduce) {
-      .loading-dots::after { animation: none; content: '...'; }
-      * { transition: none !important; }
-    }
-    /* Radio Program Card */
-    .radio-card {
-      background: var(--bg-listen); border-radius: 8px; padding: 1.5rem;
-      margin-bottom: 2rem; border: 1px solid var(--border);
-    }
-    .radio-card-header {
-      margin-bottom: 1rem;
-    }
-    .radio-card-title {
-      font-family: Georgia, serif; font-size: 1.15rem; font-weight: 700;
-      color: var(--text-primary); margin-bottom: 0.2rem;
-    }
-    .radio-card-subtitle {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.78rem; color: var(--text-muted);
-    }
-    .radio-card-action {
-      display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;
-    }
-    .radio-card-status {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.75rem; color: var(--text-muted);
-    }
-    .radio-card-script {
-      font-family: Georgia, serif; font-size: 0.92rem; line-height: 1.7;
-      color: var(--text-secondary); font-style: italic;
-      padding: 1rem; background: rgba(255,255,255,0.5); border-radius: 6px;
-      white-space: pre-wrap;
-    }
-    .radio-card-empty {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 0.9rem; color: var(--text-muted); text-align: center;
-      padding: 1.5rem 0;
-    }
-    .radio-card-empty .empty-ku {
-      font-family: Georgia, serif; font-size: 1rem; color: var(--text-secondary);
-      margin-bottom: 0.4rem;
-    }
-    @media (max-width: 599px) {
-      .radio-card { padding: 1.25rem; }
-      .radio-card-action { flex-direction: column; align-items: stretch; gap: 0.75rem; }
-      .radio-card-script { font-size: 0.88rem; padding: 0.75rem; }
-    }
+
     /* ── Persistent Audio Player Bar ── */
     .player-bar {
       position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
-      background: var(--bg-card); border-top: 1px solid var(--border);
-      padding: 0.6rem 0; transform: translateY(100%);
-      transition: transform 0.3s ease;
+      background: var(--bg-page); border-top: 1px solid var(--border);
+      height: 60px; display: flex; align-items: center;
+      transform: translateY(100%); transition: transform 0.3s ease;
     }
     .player-bar.visible { transform: translateY(0); }
-    .player-inner {
-      display: flex; align-items: center; gap: 1rem;
-    }
+    .player-inner { display: flex; align-items: center; gap: 1rem; width: 100%; }
     .player-controls { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
     .player-btn {
       background: none; border: 1px solid var(--border); border-radius: 50%;
@@ -262,7 +230,11 @@
       color: var(--text-secondary); transition: border-color 0.2s, color 0.2s;
     }
     .player-btn:hover { border-color: var(--accent); color: var(--accent); }
-    .player-btn-main { width: 38px; height: 38px; font-size: 1rem; background: var(--accent); color: #fff; border-color: var(--accent); }
+    .player-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .player-btn-main {
+      width: 38px; height: 38px; font-size: 1rem;
+      background: var(--accent); color: #fff; border-color: var(--accent);
+    }
     .player-btn-main:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
     .player-info { flex: 1; min-width: 0; }
     .player-title {
@@ -270,12 +242,32 @@
       color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       display: block; margin-bottom: 0.3rem;
     }
-    .player-progress-bar { width: 100%; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .player-progress-bar { width: 100%; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; cursor: pointer; }
     .player-progress { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s linear; }
-    body { padding-bottom: 70px; }
+
+    /* ── Responsive ── */
     @media (max-width: 599px) {
+      .site-nav { display: none; }
+      .story-headline { font-size: 1.35rem; }
+      .story-rank { font-size: 1.4rem; }
+      .listen-area { padding: 1.25rem; }
+      .story-link { margin-left: 0; }
+      .ci-bejim { font-size: 1.1rem; }
+      .program-choices { flex-direction: column; gap: 0.4rem; }
+      .program-btn { font-size: 0.75rem; padding: 0.4rem 0.75rem; width: 100%; text-align: center; }
+      .beje-row { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+      .beje-btn { width: 100%; }
       .player-inner { gap: 0.6rem; }
       .player-title { font-size: 0.78rem; }
+      .radio-card { padding: 1.25rem; }
+      .radio-card-action { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+      .radio-card-script { font-size: 0.88rem; padding: 0.75rem; }
+    }
+    @media (min-width: 600px) and (max-width: 899px) { .container { padding: 0 2rem; } }
+    @media (min-width: 900px) { .story-headline { font-size: 1.6rem; } header { padding: 2rem 0 1.5rem; } }
+    @media (prefers-reduced-motion: reduce) {
+      .loading-dots::after { animation: none; content: '...'; }
+      *, *::before, *::after { transition: none !important; animation: none !important; }
     }
   </style>
 </head>
@@ -283,7 +275,7 @@
   <header>
     <div class="container">
       <div class="header-inner">
-        <a href="/" class="wordmark-link" aria-label="Dengbej home"><h1 class="wordmark">DENGBEJ</h1></a>
+        <a href="/" class="wordmark-link" aria-label="Dengbêj home"><h1 class="wordmark">DENGBÊJ</h1></a>
         <nav class="site-nav" aria-label="Main navigation">
           <a href="/">Home</a>
           <a href="/about">About</a>
@@ -299,23 +291,23 @@
 
   <main class="container" id="main-content" aria-live="polite">
     <section class="section-intro">
-      <h2 id="section-title">Today's Dengbej</h2>
-      <p id="section-desc">Dengbej AI reimagines the Kurdish dengbêj storytelling tradition using generative AI and serverless AWS technology.</p>
+      <h2 id="section-title">Today's Dengbêj</h2>
+      <p id="section-desc">Five important stories, curated daily by AI in English and Kurdish.</p>
       <p class="date" id="currentDate"></p>
-      <p class="builder-link"><a href="https://builder.aws.com/content/3AtwFZmEnbM4cs3I7y25DHJyJlo/aideas-dengbej-ai-kurdish-storytelling-with-generative-ai" target="_blank" rel="noopener noreferrer">Read the AWS Builder story →</a></p>
     </section>
 
     <section class="listen-area" aria-label="Program selection">
-      <p class="ci-bejim" id="ci-bejim-label">Çi bêjim?</p>
-      <div class="program-choices" role="radiogroup" aria-labelledby="ci-bejim-label"></div>
-      <div class="beje-row">
-        <p class="audio-placeholder">🎙️ English narration — coming soon</p>
+      <p class="ci-bejim" id="ci-bejim-label">What should I tell you?</p>
+      <div class="program-choices" role="radiogroup" aria-labelledby="ci-bejim-label" id="program-choices"></div>
+      <div class="beje-row" id="beje-row">
+        <button class="beje-btn" id="beje-btn" type="button">Tell me!</button>
+        <span class="audio-status" id="audio-status"></span>
       </div>
     </section>
 
     <div id="stories-container">
       <div class="state-container" id="loading-state">
-        <p class="loading-dots">Preparing today's briefing</p>
+        <p class="loading-dots" id="loading-msg">Loading</p>
       </div>
     </div>
   </main>
@@ -323,10 +315,7 @@
   <div class="container">
     <section class="about-section" aria-labelledby="about-heading">
       <h2 id="about-heading">What is a Dengbêj?</h2>
-      <p>For centuries, dengbêjs have preserved Kurdish history through oral storytelling — sharing news, memories, and culture through spoken narratives that connect communities. Dengbej AI transforms this tradition using generative AI, creating Kurdish radio-style programs from current events.</p>
-    </section>
-    <section class="cta-section">
-      <p>Have an article you want summarized? <a href="story.html">Open Story Generator →</a></p>
+      <p id="about-text">For centuries, dengbêjs have preserved Kurdish history through oral storytelling — sharing news, memories, and culture through spoken narratives that connect communities. Dengbêj AI transforms this tradition using generative AI, creating Kurdish radio-style programs from current events.</p>
     </section>
   </div>
 
@@ -336,12 +325,11 @@
         <a href="/">Home</a>
         <a href="/about">About</a>
         <a href="/how-it-works">How It Works</a>
-        <a href="https://github.com/arslakin/dengbej-ai" target="_blank" rel="noopener noreferrer">GitHub</a>
-        <a href="https://builder.aws.com/content/3AtwFZmEnbM4cs3I7y25DHJyJlo/aideas-dengbej-ai-kurdish-storytelling-with-generative-ai" target="_blank" rel="noopener noreferrer">AWS Builder Article</a>
       </nav>
       <div class="footer-services">
-        <span class="service-badge">Lambda</span>
         <span class="service-badge">Bedrock</span>
+        <span class="service-badge">Polly</span>
+        <span class="service-badge">Lambda</span>
         <span class="service-badge">DynamoDB</span>
         <span class="service-badge">EventBridge</span>
         <span class="service-badge">S3</span>
@@ -351,18 +339,20 @@
     </div>
   </footer>
 
-  <!-- Audio Player Bar -->
-  <div class="player-bar" id="player-bar">
+  <!-- Persistent Audio Player Bar -->
+  <div class="player-bar" id="player-bar" role="region" aria-label="Audio player">
     <div class="container">
       <div class="player-inner">
         <div class="player-controls">
-          <button class="player-btn" onclick="playPrevProgram()" aria-label="Previous">⏮</button>
-          <button class="player-btn player-btn-main" id="play-pause-btn" onclick="togglePlayPause()" aria-label="Play/Pause">▶</button>
-          <button class="player-btn" onclick="playNextProgram()" aria-label="Next">⏭</button>
+          <button class="player-btn" id="prev-btn" aria-label="Previous program">&#9198;</button>
+          <button class="player-btn player-btn-main" id="play-pause-btn" aria-label="Play or pause">&#9654;</button>
+          <button class="player-btn" id="next-btn" aria-label="Next program">&#9197;</button>
         </div>
         <div class="player-info">
-          <span class="player-title" id="player-title">Dengbej</span>
-          <div class="player-progress-bar"><div class="player-progress" id="player-progress"></div></div>
+          <span class="player-title" id="player-title">Dengbêj</span>
+          <div class="player-progress-bar" id="progress-bar-container">
+            <div class="player-progress" id="player-progress"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -370,358 +360,377 @@
   </div>
 
   <script>
-    var API_URL = "https://77khte6fwkmwi5igfme5qezzga0kcnqv.lambda-url.us-east-1.on.aws";
-    var currentLang = sessionStorage.getItem("dengbej-lang") || "en";
-    var briefingData = null;
+    (function() {
+      "use strict";
 
-    var PROGRAMS = [
-      { id: "today", label_ku: "Nûçeyên Îro", label_en: "Today's News", available: true, group: "general" },
-      { id: "kurdistan", label_ku: "Behsa Kurdistanê bike", label_en: "About Kurdistan", available: false, group: "general" },
-      { id: "world", label_ku: "Behsa dinyayê bike", label_en: "World News", available: false, group: "general" },
-      { id: "middle-east", label_ku: "Behsa Rojhilata Navîn bike", label_en: "Middle East", available: false, group: "general" },
-      { id: "turkey", label_ku: "Behsa Tirkiyeyê bike", label_en: "About Turkey", available: false, group: "general" },
-      { id: "bakur", label_ku: "Behsa Bakur bike", label_en: "Northern Kurdistan", available: false, group: "kurdish-regions" },
-      { id: "rojava", label_ku: "Behsa Rojava bike", label_en: "Rojava", available: false, group: "kurdish-regions" },
-      { id: "basur", label_ku: "Behsa Başûr bike", label_en: "Southern Kurdistan", available: false, group: "kurdish-regions" },
-      { id: "rojhilat", label_ku: "Behsa Rojhilat bike", label_en: "Eastern Kurdistan", available: false, group: "kurdish-regions" }
-    ];
-    var selectedProgram = "today";
+      var API_URL = "https://77khte6fwkmwi5igfme5qezzga0kcnqv.lambda-url.us-east-1.on.aws";
 
-    var storiesContainer = document.getElementById("stories-container");
-    var btnEn = document.getElementById("btn-en");
-    var btnKu = document.getElementById("btn-ku");
-    var dateEl = document.getElementById("currentDate");
+      var PROGRAMS = [
+        { id: "today", label_ku: "N\u00FB\u00E7ey\u00EAn \u00CEro", label_en: "Today's News" },
+        { id: "kurdistan", label_ku: "Kurdistan\u00EA b\u00EAje", label_en: "About Kurdistan" },
+        { id: "world", label_ku: "Dinyay\u00EA b\u00EAje", label_en: "World News" },
+        { id: "middle-east", label_ku: "Rojhilata Nav\u00EEn b\u00EAje", label_en: "Middle East" },
+        { id: "turkey", label_ku: "Tirkiyey\u00EA b\u00EAje", label_en: "About Turkey" },
+        { id: "bakur", label_ku: "Bakur b\u00EAje", label_en: "Northern Kurdistan" },
+        { id: "rojava", label_ku: "Rojava b\u00EAje", label_en: "Rojava" },
+        { id: "basur", label_ku: "Ba\u015F\u00FBr b\u00EAje", label_en: "Southern Kurdistan" },
+        { id: "rojhilat", label_ku: "Rojhilat b\u00EAje", label_en: "Eastern Kurdistan" }
+      ];
 
-    var todayFormatted = new Date().toLocaleDateString("en-US", {
-      weekday: "long", year: "numeric", month: "long", day: "numeric"
-    });
-    dateEl.textContent = todayFormatted;
+      var currentLang = sessionStorage.getItem("dengbej-lang") || "en";
+      var selectedProgram = "today";
+      var currentData = null;
+      var audioPlaying = false;
 
-    var categoryColors = {
-      conflict: "var(--cat-conflict)", politics: "var(--cat-politics)",
-      "human rights": "var(--cat-human-rights)", "human-rights": "var(--cat-human-rights)",
-      economy: "var(--cat-economy)", health: "var(--cat-health)",
-      migration: "var(--cat-migration)", climate: "var(--cat-climate)",
-      technology: "var(--cat-technology)", culture: "var(--cat-culture)",
-      world: "var(--cat-world)"
-    };
+      // DOM refs
+      var btnEn = document.getElementById("btn-en");
+      var btnKu = document.getElementById("btn-ku");
+      var dateEl = document.getElementById("currentDate");
+      var storiesContainer = document.getElementById("stories-container");
+      var programChoices = document.getElementById("program-choices");
+      var bejeBtn = document.getElementById("beje-btn");
+      var audioStatusEl = document.getElementById("audio-status");
+      var playerBar = document.getElementById("player-bar");
+      var playerTitle = document.getElementById("player-title");
+      var playPauseBtn = document.getElementById("play-pause-btn");
+      var prevBtn = document.getElementById("prev-btn");
+      var nextBtn = document.getElementById("next-btn");
+      var playerProgress = document.getElementById("player-progress");
+      var progressBarContainer = document.getElementById("progress-bar-container");
+      var audioPlayer = document.getElementById("audio-player");
 
-    function getCategoryColor(cat) {
-      if (!cat) return "var(--text-muted)";
-      return categoryColors[cat.toLowerCase()] || "var(--cat-world)";
-    }
+      // ── Utilities ──
+      function escapeHtml(str) {
+        if (!str) return "";
+        return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      }
 
-    function escapeHtml(str) {
-      if (!str) return "";
-      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    }
+      var categoryColors = {
+        conflict: "var(--cat-conflict)", politics: "var(--cat-politics)",
+        "human rights": "var(--cat-human-rights)", "human-rights": "var(--cat-human-rights)",
+        economy: "var(--cat-economy)", health: "var(--cat-health)",
+        migration: "var(--cat-migration)", climate: "var(--cat-climate)",
+        technology: "var(--cat-technology)", culture: "var(--cat-culture)",
+        world: "var(--cat-world)"
+      };
 
-    function timeAgo(dateStr) {
-      if (!dateStr) return "";
-      var now = new Date(), then = new Date(dateStr);
-      var diff = Math.floor((now - then) / 1000);
-      if (diff < 60) return "just now";
-      if (diff < 3600) return Math.floor(diff / 60) + " min ago";
-      if (diff < 86400) return Math.floor(diff / 3600) + " hours ago";
-      if (diff < 172800) return "yesterday";
-      return Math.floor(diff / 86400) + " days ago";
-    }
+      function getCategoryColor(cat) {
+        if (!cat) return "var(--text-muted)";
+        return categoryColors[cat.toLowerCase()] || "var(--cat-world)";
+      }
 
-    function renderPrograms() {
-      var container = document.querySelector(".program-choices");
-      var html = "";
-      PROGRAMS.forEach(function(prog) {
-        var label = currentLang === "ku" ? prog.label_ku : prog.label_en;
-        var selected = prog.id === selectedProgram;
-        html += '<button type="button" class="program-btn" role="radio" '
-          + 'aria-checked="' + selected + '" '
-          + 'data-program="' + prog.id + '" '
-          + '>' + escapeHtml(label) + '</button>';
-      });
-      container.innerHTML = html;
-      container.querySelectorAll(".program-btn").forEach(function(btn) {
-        btn.addEventListener("click", function() {
-          if (btn.disabled) return;
-          selectedProgram = btn.getAttribute("data-program");
-          renderPrograms();
-          updateBejeState();
-          if (selectedProgram === "today") {
-            if (briefingData) renderBriefing(briefingData);
-            else loadBriefing();
-          } else {
-            loadProgram(selectedProgram);
-          }
+      function formatDate() {
+        return new Date().toLocaleDateString("en-US", {
+          weekday: "long", year: "numeric", month: "long", day: "numeric"
         });
-      });
-    }
-
-    function updateBejeState() {
-      var bejeRow = document.querySelector(".beje-row");
-      if (!bejeRow) return;
-
-      // Check if current briefing has audio
-      if (selectedProgram === "today" && briefingData && briefingData.daily_audio && briefingData.daily_audio.available && briefingData.daily_audio.url) {
-        bejeRow.innerHTML = '<button class="beje-btn" onclick="playAudio(\'' + escapeHtml(briefingData.daily_audio.url) + '\')" aria-label="' +
-          (currentLang === "ku" ? "Bibihîze" : "Listen") + '">Bêje! ▶</button>' +
-          '<span class="audio-status">' + (currentLang === "ku" ? "Deng bi Îngilîzî amade ye" : "English narration ready") + '</span>';
-      } else {
-        bejeRow.innerHTML = '<p class="audio-placeholder">' +
-          (currentLang === "ku" ? "🎙️ Deng bi Îngilîzî — zû tê" : "🎙️ English narration — coming soon") +
-          '</p>';
       }
-    }
 
-    function setLanguage(lang) {
-      currentLang = lang;
-      sessionStorage.setItem("dengbej-lang", lang);
-      btnEn.setAttribute("aria-pressed", lang === "en");
-      btnKu.setAttribute("aria-pressed", lang === "ku");
-      document.documentElement.lang = lang === "ku" ? "ku" : "en";
-      document.getElementById("ci-bejim-label").textContent = lang === "ku" ? "Çi bêjim?" : "What should I tell you?";
-      document.getElementById("section-title").textContent = lang === "ku" ? "Nûçeyên Dengbej" : "Today's Dengbej";
-      document.getElementById("section-desc").textContent = lang === "ku" ? "Dengbej AI kevneşopiya dengbêjiya Kurdî bi AI û AWS-ê nûve dike." : "Dengbej AI reimagines the Kurdish dengbêj storytelling tradition using generative AI and serverless AWS technology.";
-      renderPrograms();
-      updateBejeState();
-      if (briefingData) renderBriefing(briefingData);
-    }
+      // ── Language ──
+      function setLanguage(lang) {
+        currentLang = lang;
+        sessionStorage.setItem("dengbej-lang", lang);
+        btnEn.setAttribute("aria-pressed", String(lang === "en"));
+        btnKu.setAttribute("aria-pressed", String(lang === "ku"));
+        document.documentElement.lang = lang === "ku" ? "ku" : "en";
 
-    btnEn.addEventListener("click", function() { setLanguage("en"); });
-    btnKu.addEventListener("click", function() { setLanguage("ku"); });
+        document.getElementById("section-title").textContent = lang === "ku" ? "Dengb\u00EAj\u00EA \u00CEro" : "Today\u2019s Dengb\u00EAj";
+        document.getElementById("section-desc").textContent = lang === "ku"
+          ? "P\u00EAnc nû\u00E7ey\u00EAn giring, her roj bi AI-\u00EA bi Kurd\u00EE \u00FB \u00CEngilîzî t\u00EAn amadekirin."
+          : "Five important stories, curated daily by AI in English and Kurdish.";
+        document.getElementById("ci-bejim-label").textContent = lang === "ku" ? "\u00C7i b\u00EAjim?" : "What should I tell you?";
+        document.getElementById("about-heading").textContent = lang === "ku" ? "Dengb\u00EAj \u00E7i ye?" : "What is a Dengb\u00EAj?";
+        document.getElementById("about-text").textContent = lang === "ku"
+          ? "Bi sedsalan, dengb\u00EAjan d\u00EEroka Kurd bi \u00E7\u00EErok\u00EAn dev\u00EE parastin \u2014 n\u00FB\u00E7e, b\u00EErewirî \u00FB \u00E7and bi axaftinê belav kirin. Dengb\u00EAj AI v\u00EA kevne\u015Fopiy\u00EA bi AI-\u00EA nûve dike."
+          : "For centuries, dengb\u00EAjs have preserved Kurdish history through oral storytelling \u2014 sharing news, memories, and culture through spoken narratives that connect communities. Dengb\u00EAj AI transforms this tradition using generative AI, creating Kurdish radio-style programs from current events.";
 
-    function renderBriefing(data) {
-      var stories = data.stories || data.briefing || [];
-      if (!stories.length) {
-        storiesContainer.innerHTML = '<div class="state-container"><p>No stories available right now.</p></div>';
-        return;
+        renderPrograms();
+        updateBejeButton();
+        if (currentData) renderStories(currentData);
       }
-      var html = "";
-      stories.forEach(function(story, i) {
-        var rank = String(i + 1).padStart(2, "0");
-        var category = story.category || "world";
-        var headline = currentLang === "ku" ? (story.headline_ku || story.headline || "") : (story.headline || "");
-        var summary = currentLang === "ku" ? (story.summary_ku || story.summary_en) : story.summary_en;
-        var source = story.primary_source ? story.primary_source.name : "";
-        var sourceUrl = story.primary_source ? story.primary_source.url : "";
-        var time = timeAgo(story.published_at);
-        var supporting = (story.supporting_sources || []).map(function(s) { return s.name; }).filter(Boolean);
-        html += '<article class="story">';
-        html += '<div class="story-rank">' + rank + '</div>';
-        html += '<span class="story-category" style="color:' + getCategoryColor(category) + '">' + escapeHtml(category) + '</span>';
-        html += '<h3 class="story-headline">' + escapeHtml(headline) + '</h3>';
-        html += '<p class="story-summary">' + escapeHtml(summary) + '</p>';
-        html += '<div class="story-footer">';
-        if (source) html += '<span class="story-source">Source: ' + escapeHtml(source) + '</span>';
-        if (supporting.length) html += '<span>Also covered by: ' + supporting.map(function(s) { return escapeHtml(s); }).join(", ") + '</span>';
-        if (sourceUrl) html += '<a class="story-link" href="' + escapeHtml(sourceUrl) + '" target="_blank" rel="noopener noreferrer">Read original →</a>';
-        if (time) html += '<span class="story-time">' + time + '</span>';
-        html += '</div></article>';
-      });
-      storiesContainer.innerHTML = html;
-    }
 
-    function showLoading() {
-      storiesContainer.innerHTML = '<div class="state-container"><p class="loading-dots">Preparing today\'s briefing</p></div>';
-    }
-
-    function showError() {
-      storiesContainer.innerHTML = '<div class="state-container"><p>Today\'s briefing is temporarily unavailable.</p><button class="retry-btn" onclick="loadBriefing()">Retry</button></div>';
-    }
-
-    async function loadBriefing() {
-      showLoading();
-      try {
-        var res = await fetch(API_URL + "/news/today");
-        if (!res.ok) throw new Error(res.status);
-        var data = await res.json();
-        briefingData = data;
-        renderBriefing(data);
-        updateBejeState();
-      } catch (err) {
-        showError();
+      // ── Programs ──
+      function renderPrograms() {
+        var html = "";
+        PROGRAMS.forEach(function(prog) {
+          var label = currentLang === "ku" ? prog.label_ku : prog.label_en;
+          var selected = prog.id === selectedProgram;
+          html += '<button type="button" class="program-btn" role="radio" aria-checked="' + selected + '" data-program="' + prog.id + '">' + escapeHtml(label) + '</button>';
+        });
+        programChoices.innerHTML = html;
+        programChoices.querySelectorAll(".program-btn").forEach(function(btn) {
+          btn.addEventListener("click", function() {
+            selectedProgram = btn.getAttribute("data-program");
+            renderPrograms();
+            updateBejeButton();
+          });
+        });
       }
-    }
 
-    async function loadProgram(programId) {
-      showLoading();
-      try {
-        var res = await fetch(API_URL + "/news/program/" + programId);
-        if (!res.ok) throw new Error(res.status);
-        var data = await res.json();
-        renderProgramView(data, programId);
-      } catch (err) {
-        storiesContainer.innerHTML = '<div class="state-container"><p>' +
-          (currentLang === "ku" ? "Nebû ku bernameyê bar bikin." : "Could not load this program.") +
-          '</p></div>';
-      }
-    }
-
-    function renderProgramView(data, programId) {
-      var prog = PROGRAMS.find(function(p) { return p.id === programId; });
-      var labelKu = prog ? prog.label_ku : data.label_ku || programId;
-      var labelEn = prog ? prog.label_en : data.label_en || programId;
-      var stories = data.stories || [];
-      var scriptKu = data.script_ku || null;
-      var audioAvailable = data.audio && data.audio.available && data.audio.url;
-      var storyCount = data.story_count || stories.length;
-
-      var html = '';
-
-      // Radio Card
-      html += '<div class="radio-card">';
-
-      if (storyCount === 0) {
-        // Empty program — intentional editorial state
-        html += '<div class="radio-card-empty">';
-        html += '<p class="empty-ku">Niha nûçeyên vê bernameyê nîn in.</p>';
-        html += '<p>No relevant stories are available in this program right now.</p>';
-        html += '</div>';
-      } else {
-        // Header
-        html += '<div class="radio-card-header">';
-        html += '<h2 class="radio-card-title">' + escapeHtml(labelKu) + '</h2>';
-        html += '<p class="radio-card-subtitle">' + escapeHtml(labelEn) + ' · ' + storyCount + (currentLang === "ku" ? " nûçe" : " stories") + '</p>';
-        html += '</div>';
-
-        // Action row
-        html += '<div class="radio-card-action">';
-        if (audioAvailable) {
-          html += '<button class="beje-btn" onclick="playAudio(\'' + escapeHtml(data.audio.url) + '\')" aria-label="' + (currentLang === "ku" ? "Bibihîze" : "Listen") + '">Bêje! ▶</button>';
-          html += '<span class="radio-card-status">' + (currentLang === "ku" ? "Deng bi Îngilîzî amade ye" : "English narration ready") + '</span>';
+      function updateBejeButton() {
+        var label = currentLang === "ku" ? "B\u00EAje!" : "Tell me!";
+        // If audio is currently playing for a loaded program, show play indicator
+        if (currentData && currentData._programId === selectedProgram && currentData.audio && currentData.audio.available && currentData.audio.url) {
+          bejeBtn.textContent = label + " \u25B6";
+          bejeBtn.disabled = false;
+          audioStatusEl.textContent = currentLang === "ku" ? "Deng bi \u00CEngilîz\u00EE amade ye" : "English narration ready";
+        } else if (currentData && currentData._programId === selectedProgram && selectedProgram === "today" && currentData.daily_audio && currentData.daily_audio.available && currentData.daily_audio.url) {
+          bejeBtn.textContent = label + " \u25B6";
+          bejeBtn.disabled = false;
+          audioStatusEl.textContent = currentLang === "ku" ? "Deng bi \u00CEngilîz\u00EE amade ye" : "English narration ready";
         } else {
-          html += '<button class="beje-btn" disabled aria-label="' + (currentLang === "ku" ? "Deng hîn amade nîne" : "Audio not yet available") + '">Bêje!</button>';
-          html += '<span class="radio-card-status">' + (currentLang === "ku" ? "Deng bi Îngilîzî tê amadekirin" : "English narration coming soon") + '</span>';
-        }
-        html += '</div>';
-
-        // Kurmanji narration
-        if (scriptKu) {
-          html += '<div class="radio-card-script" lang="ku">' + escapeHtml(scriptKu) + '</div>';
+          bejeBtn.textContent = label;
+          bejeBtn.disabled = false;
+          audioStatusEl.textContent = currentLang === "ku" ? "Deng bi \u00CEngilîz\u00EE \u2014 z\u00FB t\u00EA" : "English narration coming soon";
         }
       }
 
-      html += '</div>';
+      // ── Bêje Button Handler ──
+      bejeBtn.addEventListener("click", function() {
+        if (selectedProgram === "today") {
+          loadToday();
+        } else {
+          loadProgram(selectedProgram);
+        }
+      });
 
-      // Stories underneath
-      if (stories.length > 0) {
+      // ── Data Loading ──
+      function showLoading() {
+        var msg = currentLang === "ku" ? "T\u00EA amadekirin" : "Loading";
+        storiesContainer.innerHTML = '<div class="state-container"><p class="loading-dots">' + escapeHtml(msg) + '</p></div>';
+      }
+
+      function showError() {
+        var msg = currentLang === "ku" ? "Niha peyda n\u00EEne." : "Temporarily unavailable.";
+        var retryLabel = currentLang === "ku" ? "Dîsa biceribîne" : "Retry";
+        storiesContainer.innerHTML = '<div class="state-container"><p>' + escapeHtml(msg) + '</p><button class="retry-btn" id="retry-btn">' + escapeHtml(retryLabel) + '</button></div>';
+        document.getElementById("retry-btn").addEventListener("click", function() {
+          if (selectedProgram === "today") loadToday(); else loadProgram(selectedProgram);
+        });
+      }
+
+      function showEmpty() {
+        var msg = currentLang === "ku" ? "Niha n\u00FB\u00E7ey\u00EAn v\u00EA bernam\u00EAy\u00EA n\u00EEn in." : "No stories available for this program.";
+        storiesContainer.innerHTML = '<div class="state-container"><p>' + escapeHtml(msg) + '</p></div>';
+      }
+
+      function loadToday() {
+        showLoading();
+        fetch(API_URL + "/news/today")
+          .then(function(res) {
+            if (!res.ok) throw new Error(res.status);
+            return res.json();
+          })
+          .then(function(data) {
+            data._programId = "today";
+            currentData = data;
+            renderStories(data);
+            updateBejeButton();
+            // Auto-play if audio available
+            var audioUrl = (data.daily_audio && data.daily_audio.available) ? data.daily_audio.url : null;
+            if (audioUrl) playAudio(audioUrl);
+          })
+          .catch(function() { showError(); });
+      }
+
+      function loadProgram(programId) {
+        showLoading();
+        fetch(API_URL + "/news/program/" + encodeURIComponent(programId))
+          .then(function(res) {
+            if (!res.ok) throw new Error(res.status);
+            return res.json();
+          })
+          .then(function(data) {
+            data._programId = programId;
+            currentData = data;
+            renderProgramView(data, programId);
+            updateBejeButton();
+            // Auto-play if audio available
+            var audioUrl = (data.audio && data.audio.available) ? data.audio.url : null;
+            if (audioUrl) playAudio(audioUrl);
+          })
+          .catch(function() { showError(); });
+      }
+
+      // ── Render Stories (Today) ──
+      function renderStories(data) {
+        var stories = data.stories || data.briefing || [];
+        if (!stories.length) { showEmpty(); return; }
+        var html = "";
+        stories.forEach(function(story, i) {
+          var rank = String(i + 1).padStart(2, "0");
+          var category = story.category || "world";
+          var headline = currentLang === "ku" ? (story.headline_ku || story.headline || "") : (story.headline || "");
+          var summary = currentLang === "ku" ? (story.summary_ku || story.summary_en || "") : (story.summary_en || "");
+          var source = story.primary_source ? story.primary_source.name : "";
+          var sourceUrl = story.primary_source ? story.primary_source.url : "";
+          html += '<article class="story">';
+          html += '<div class="story-rank">' + rank + '</div>';
+          html += '<span class="story-category" style="color:' + getCategoryColor(category) + '">' + escapeHtml(category) + '</span>';
+          html += '<h3 class="story-headline">' + escapeHtml(headline) + '</h3>';
+          html += '<p class="story-summary">' + escapeHtml(summary) + '</p>';
+          html += '<div class="story-footer">';
+          if (source) html += '<span class="story-source">' + escapeHtml(source) + '</span>';
+          if (sourceUrl) html += '<a class="story-link" href="' + escapeHtml(sourceUrl) + '" target="_blank" rel="noopener noreferrer">' + (currentLang === "ku" ? "Bixw\u00EEne \u2192" : "Read original \u2192") + '</a>';
+          html += '</div></article>';
+        });
+        storiesContainer.innerHTML = html;
+      }
+
+      // ── Render Program View (non-today) ──
+      function renderProgramView(data, programId) {
+        var prog = PROGRAMS.find(function(p) { return p.id === programId; });
+        var labelKu = prog ? prog.label_ku : programId;
+        var labelEn = prog ? prog.label_en : programId;
+        var stories = data.stories || [];
+        var scriptKu = data.script_ku || null;
+        var audioAvailable = data.audio && data.audio.available && data.audio.url;
+        var storyCount = data.story_count || stories.length;
+
+        var html = '<div class="radio-card">';
+
+        if (storyCount === 0 && stories.length === 0) {
+          html += '<div class="radio-card-empty">';
+          html += '<p class="empty-ku">Niha n\u00FB\u00E7ey\u00EAn v\u00EA bernam\u00EAy\u00EA n\u00EEn in.</p>';
+          html += '<p>No stories available for this program.</p>';
+          html += '</div>';
+        } else {
+          html += '<div class="radio-card-header">';
+          html += '<h2 class="radio-card-title">' + escapeHtml(labelKu) + '</h2>';
+          html += '<p class="radio-card-subtitle">' + escapeHtml(labelEn) + ' \u00B7 ' + storyCount + (currentLang === "ku" ? " n\u00FB\u00E7e" : " stories") + '</p>';
+          html += '</div>';
+          html += '<div class="radio-card-action">';
+          if (audioAvailable) {
+            html += '<button class="beje-btn" id="card-play-btn">' + (currentLang === "ku" ? "B\u00EAje! \u25B6" : "Tell me! \u25B6") + '</button>';
+            html += '<span class="radio-card-status">' + (currentLang === "ku" ? "Deng bi \u00CEngilîz\u00EE amade ye" : "English narration ready") + '</span>';
+          } else {
+            html += '<span class="radio-card-status">' + (currentLang === "ku" ? "Deng bi \u00CEngilîz\u00EE \u2014 z\u00FB t\u00EA" : "English narration coming soon") + '</span>';
+          }
+          html += '</div>';
+          if (scriptKu) {
+            html += '<div class="radio-card-script" lang="ku">' + escapeHtml(scriptKu) + '</div>';
+          }
+        }
+        html += '</div>';
+
+        // Stories list
         stories.forEach(function(story, i) {
           var rank = String(i + 1).padStart(2, "0");
           var category = story.category || programId;
           var headline = currentLang === "ku" ? (story.headline_ku || story.headline || "") : (story.headline || "");
-          var summary = story.feed_description || "";
+          var summary = currentLang === "ku" ? (story.summary_ku || story.feed_description || "") : (story.feed_description || story.summary_en || "");
           var source = story.primary_source ? story.primary_source.name : "";
           var sourceUrl = story.primary_source ? story.primary_source.url : "";
-          var time = timeAgo(story.published_at);
-          var supporting = (story.supporting_sources || []).map(function(s) { return s.name; }).filter(Boolean);
           html += '<article class="story">';
           html += '<div class="story-rank">' + rank + '</div>';
           html += '<span class="story-category" style="color:' + getCategoryColor(category) + '">' + escapeHtml(category) + '</span>';
           html += '<h3 class="story-headline">' + escapeHtml(headline) + '</h3>';
           if (summary) html += '<p class="story-summary">' + escapeHtml(summary) + '</p>';
           html += '<div class="story-footer">';
-          if (source) html += '<span class="story-source">Source: ' + escapeHtml(source) + '</span>';
-          if (supporting.length) html += '<span>Also: ' + supporting.map(function(s) { return escapeHtml(s); }).join(", ") + '</span>';
-          if (sourceUrl) html += '<a class="story-link" href="' + escapeHtml(sourceUrl) + '" target="_blank" rel="noopener noreferrer">Read original →</a>';
-          if (time) html += '<span class="story-time">' + time + '</span>';
+          if (source) html += '<span class="story-source">' + escapeHtml(source) + '</span>';
+          if (sourceUrl) html += '<a class="story-link" href="' + escapeHtml(sourceUrl) + '" target="_blank" rel="noopener noreferrer">' + (currentLang === "ku" ? "Bixw\u00EEne \u2192" : "Read original \u2192") + '</a>';
           html += '</div></article>';
         });
-      }
 
-      storiesContainer.innerHTML = html;
-    }
+        storiesContainer.innerHTML = html;
 
-    function playAudio(url) {
-      if (!url) return;
-      var player = document.getElementById("audio-player");
-      var playerBar = document.getElementById("player-bar");
-      var playerTitle = document.getElementById("player-title");
-      var playPauseBtn = document.getElementById("play-pause-btn");
-
-      if (!player) return;
-
-      // Show player bar
-      playerBar.classList.add("visible");
-
-      // Set title based on current program
-      var prog = PROGRAMS.find(function(p) { return p.id === selectedProgram; });
-      playerTitle.textContent = prog
-        ? (currentLang === "ku" ? prog.label_ku : prog.label_en)
-        : "Dengbej";
-
-      // If same URL, toggle play/pause
-      if (player.src === url && !player.paused) {
-        player.pause();
-        playPauseBtn.textContent = "▶";
-        return;
-      }
-
-      player.src = url;
-      player.load();
-      player.play().then(function() {
-        playPauseBtn.textContent = "⏸";
-      }).catch(function() {
-        playPauseBtn.textContent = "▶";
-      });
-    }
-
-    function togglePlayPause() {
-      var player = document.getElementById("audio-player");
-      var playPauseBtn = document.getElementById("play-pause-btn");
-      if (!player || !player.src) return;
-
-      if (player.paused) {
-        player.play().then(function() { playPauseBtn.textContent = "⏸"; }).catch(function() {});
-      } else {
-        player.pause();
-        playPauseBtn.textContent = "▶";
-      }
-    }
-
-    function playNextProgram() {
-      var currentIdx = PROGRAMS.findIndex(function(p) { return p.id === selectedProgram; });
-      if (currentIdx < PROGRAMS.length - 1) {
-        var nextProg = PROGRAMS[currentIdx + 1];
-        selectedProgram = nextProg.id;
-        renderPrograms();
-        loadProgram(selectedProgram);
-      }
-    }
-
-    function playPrevProgram() {
-      var currentIdx = PROGRAMS.findIndex(function(p) { return p.id === selectedProgram; });
-      if (currentIdx > 0) {
-        var prevProg = PROGRAMS[currentIdx - 1];
-        selectedProgram = prevProg.id;
-        renderPrograms();
-        if (selectedProgram === "today") {
-          if (briefingData) renderBriefing(briefingData);
-          else loadBriefing();
-        } else {
-          loadProgram(selectedProgram);
+        // Bind card play button if present
+        var cardPlayBtn = document.getElementById("card-play-btn");
+        if (cardPlayBtn && audioAvailable) {
+          cardPlayBtn.addEventListener("click", function() {
+            playAudio(data.audio.url);
+          });
         }
       }
-    }
 
-    // Auto-advance when audio ends (continuous radio mode)
-    document.addEventListener("DOMContentLoaded", function() {
-      var player = document.getElementById("audio-player");
-      if (player) {
-        player.addEventListener("ended", function() {
-          var playPauseBtn = document.getElementById("play-pause-btn");
-          if (playPauseBtn) playPauseBtn.textContent = "▶";
-          // Auto-advance to next program
-          playNextProgram();
-        });
-        player.addEventListener("timeupdate", function() {
-          var progress = document.getElementById("player-progress");
-          if (progress && player.duration) {
-            progress.style.width = (player.currentTime / player.duration * 100) + "%";
-          }
+      // ── Audio Player ──
+      function playAudio(url) {
+        if (!url) return;
+        playerBar.classList.add("visible");
+
+        var prog = PROGRAMS.find(function(p) { return p.id === selectedProgram; });
+        playerTitle.textContent = prog ? (currentLang === "ku" ? prog.label_ku : prog.label_en) : "Dengb\u00EAj";
+
+        if (audioPlayer.src === url && !audioPlayer.paused) {
+          audioPlayer.pause();
+          playPauseBtn.innerHTML = "&#9654;";
+          return;
+        }
+
+        audioPlayer.src = url;
+        audioPlayer.load();
+        audioPlayer.play().then(function() {
+          playPauseBtn.innerHTML = "&#9208;";
+        }).catch(function() {
+          playPauseBtn.innerHTML = "&#9654;";
         });
       }
-    });
 
-    setLanguage(currentLang);
-    loadBriefing();
+      function togglePlayPause() {
+        if (!audioPlayer.src) return;
+        if (audioPlayer.paused) {
+          audioPlayer.play().then(function() { playPauseBtn.innerHTML = "&#9208;"; }).catch(function() {});
+        } else {
+          audioPlayer.pause();
+          playPauseBtn.innerHTML = "&#9654;";
+        }
+      }
+
+      function playNextProgram() {
+        var idx = PROGRAMS.findIndex(function(p) { return p.id === selectedProgram; });
+        if (idx < PROGRAMS.length - 1) {
+          selectedProgram = PROGRAMS[idx + 1].id;
+          renderPrograms();
+          if (selectedProgram === "today") loadToday(); else loadProgram(selectedProgram);
+        }
+      }
+
+      function playPrevProgram() {
+        var idx = PROGRAMS.findIndex(function(p) { return p.id === selectedProgram; });
+        if (idx > 0) {
+          selectedProgram = PROGRAMS[idx - 1].id;
+          renderPrograms();
+          if (selectedProgram === "today") loadToday(); else loadProgram(selectedProgram);
+        }
+      }
+
+      // Player event listeners
+      playPauseBtn.addEventListener("click", togglePlayPause);
+      prevBtn.addEventListener("click", playPrevProgram);
+      nextBtn.addEventListener("click", playNextProgram);
+
+      audioPlayer.addEventListener("timeupdate", function() {
+        if (audioPlayer.duration) {
+          playerProgress.style.width = (audioPlayer.currentTime / audioPlayer.duration * 100) + "%";
+        }
+      });
+
+      audioPlayer.addEventListener("ended", function() {
+        playPauseBtn.innerHTML = "&#9654;";
+        playerProgress.style.width = "0%";
+        // Auto-advance to next program
+        var prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (!prefersReduced) {
+          playNextProgram();
+        }
+      });
+
+      // Click on progress bar to seek
+      progressBarContainer.addEventListener("click", function(e) {
+        if (!audioPlayer.duration) return;
+        var rect = progressBarContainer.getBoundingClientRect();
+        var ratio = (e.clientX - rect.left) / rect.width;
+        audioPlayer.currentTime = ratio * audioPlayer.duration;
+      });
+
+      // Language toggle
+      btnEn.addEventListener("click", function() { setLanguage("en"); });
+      btnKu.addEventListener("click", function() { setLanguage("ku"); });
+
+      // ── Init ──
+      dateEl.textContent = formatDate();
+      setLanguage(currentLang);
+      loadToday();
+    })();
   </script>
 </body>
 </html>

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About Dengbêj</title>
+  <meta name="description" content="Learn about Dengbêj AI — a project that reimagines Kurdish oral storytelling with generative AI and AWS.">
+  <style>
+    :root {
+      --text-primary: #111; --text-secondary: #444; --text-muted: #777;
+      --bg-page: #faf9f7; --bg-listen: #f5f0ea; --bg-card: #fff;
+      --accent: #7a3b10; --accent-hover: #5c2d0c; --accent-light: #f5ede4;
+      --border: #e5e0d8; --link: #1a4a8a; --link-hover: #0d3266;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Georgia, 'Times New Roman', serif;
+      background: var(--bg-page); color: var(--text-primary);
+      line-height: 1.7; -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 700px; margin: 0 auto; padding: 0 1.25rem; }
+
+    /* ── Header ── */
+    header { padding: 1.5rem 0 1.25rem; border-bottom: 1px solid var(--border); }
+    .header-inner { display: flex; justify-content: space-between; align-items: center; }
+    .wordmark {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 1.3rem; font-weight: 700; letter-spacing: 0.18em; color: var(--text-primary);
+    }
+    .wordmark-link { text-decoration: none; }
+    .site-nav {
+      display: flex; gap: 1.25rem;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.8rem;
+    }
+    .site-nav a {
+      color: var(--text-secondary); text-decoration: none; font-weight: 500;
+      transition: color 0.15s ease;
+    }
+    .site-nav a:hover { color: var(--accent); }
+    .site-nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .lang-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+    .lang-toggle button {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.78rem; padding: 0.35rem 0.75rem; border: none;
+      background: transparent; color: var(--text-secondary); cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .lang-toggle button:hover { background: var(--accent-light); }
+    .lang-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .lang-toggle button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+
+    /* ── Content ── */
+    .page-title {
+      font-size: 1.8rem; font-weight: 700; margin: 2.5rem 0 0.5rem; line-height: 1.3;
+    }
+    .page-subtitle {
+      font-size: 1rem; color: var(--text-secondary); margin-bottom: 2.5rem;
+    }
+    .content-section { margin-bottom: 2.5rem; }
+    .content-section h2 {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 0.75rem;
+    }
+    .content-section p {
+      font-size: 1rem; color: var(--text-secondary); line-height: 1.8; margin-bottom: 1rem;
+    }
+    .content-section ul {
+      list-style: none; padding: 0;
+    }
+    .content-section li {
+      padding: 0.75rem 0; border-bottom: 1px solid var(--border);
+      font-size: 0.95rem; color: var(--text-secondary); line-height: 1.6;
+    }
+    .content-section li:last-child { border-bottom: none; }
+    .service-name {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 0.15rem;
+      font-size: 0.88rem;
+    }
+    .service-desc { font-size: 0.88rem; }
+    .roadmap-list { list-style: disc; padding-left: 1.25rem; }
+    .roadmap-list li { border-bottom: none; padding: 0.35rem 0; font-size: 0.95rem; }
+    .back-link {
+      display: inline-block; margin-top: 1rem; margin-bottom: 3rem;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.85rem; color: var(--link); text-decoration: none; font-weight: 500;
+    }
+    .back-link:hover { color: var(--link-hover); text-decoration: underline; }
+    .back-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border); padding: 1.75rem 0 3rem;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.75rem; color: var(--text-muted); text-align: center; line-height: 1.8;
+    }
+    .footer-nav {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .footer-nav a { color: var(--text-muted); text-decoration: none; font-weight: 500; }
+    .footer-nav a:hover { color: var(--accent); text-decoration: underline; }
+    .footer-nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .footer-services {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem;
+      margin-bottom: 0.75rem;
+    }
+    .service-badge {
+      display: inline-block; padding: 0.2rem 0.55rem;
+      border: 1px solid var(--border); border-radius: 3px;
+      font-size: 0.68rem; color: var(--text-secondary); background: var(--bg-page);
+    }
+    .footer-tagline { color: var(--text-muted); font-style: italic; }
+
+    /* ── Responsive ── */
+    @media (max-width: 599px) {
+      .site-nav { display: none; }
+      .page-title { font-size: 1.5rem; }
+    }
+    @media (min-width: 600px) and (max-width: 899px) { .container { padding: 0 2rem; } }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="header-inner">
+        <a href="/" class="wordmark-link" aria-label="Dengbêj home"><h1 class="wordmark">DENGBÊJ</h1></a>
+        <nav class="site-nav" aria-label="Main navigation">
+          <a href="/">Home</a>
+          <a href="/about">About</a>
+          <a href="/how-it-works">How It Works</a>
+        </nav>
+        <nav class="lang-toggle" aria-label="Language selection">
+          <button type="button" id="btn-en" aria-pressed="true">English</button>
+          <button type="button" id="btn-ku" aria-pressed="false">Kurdî</button>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <h1 class="page-title" id="page-title">About Dengbêj</h1>
+    <p class="page-subtitle" id="page-subtitle">The story behind the storyteller.</p>
+
+    <section class="content-section">
+      <h2 id="h-dengbej">What is a Dengbêj?</h2>
+      <p id="p-dengbej-1">A dengbêj is a traditional Kurdish oral storyteller. For generations, dengbêjs have been the voice of their communities — recounting histories, delivering news from distant villages, and preserving collective memory through song and spoken word.</p>
+      <p id="p-dengbej-2">The dengbêj tradition is particularly strong in the Kurmanji-speaking regions. Without written archives, these storytellers carried entire histories in their voices, performing in gathering houses called "dîwanxane" where communities would come together to listen.</p>
+      <p id="p-dengbej-3">Today, as Kurdish language faces challenges in many regions, the dengbêj tradition represents both cultural resistance and continuity — a reminder that stories survive through telling.</p>
+    </section>
+
+    <section class="content-section">
+      <h2 id="h-project">About This Project</h2>
+      <p id="p-project-1">Dengbêj AI uses generative AI to create Kurdish news radio programs from current events. It fetches global news, summarizes and translates stories into Kurdish Kurmanji, and generates audio narration — all automatically, twice daily.</p>
+      <p id="p-project-2">Built for the AWS 10,000 AIdeas Weekend Challenge, this project demonstrates how serverless architecture and foundation models can serve under-resourced languages and preserve cultural traditions in new forms.</p>
+    </section>
+
+    <section class="content-section">
+      <h2 id="h-services">AWS Services Used</h2>
+      <ul id="services-list">
+        <li><span class="service-name">Amazon Bedrock</span><span class="service-desc">Story summarization, Kurdish translation, and broadcast script generation using foundation models.</span></li>
+        <li><span class="service-name">Amazon Polly</span><span class="service-desc">English narration audio synthesis for daily news programs.</span></li>
+        <li><span class="service-name">AWS Lambda</span><span class="service-desc">Serverless compute for all pipeline stages — ingestion, curation, translation, and audio generation.</span></li>
+        <li><span class="service-name">Amazon DynamoDB</span><span class="service-desc">Storage for articles, briefings, and program data with fast key-value access.</span></li>
+        <li><span class="service-name">Amazon EventBridge</span><span class="service-desc">Scheduled pipeline automation triggering ingestion and curation on a fixed cadence.</span></li>
+        <li><span class="service-name">Amazon S3</span><span class="service-desc">Audio file storage for generated narration clips.</span></li>
+        <li><span class="service-name">AWS Amplify</span><span class="service-desc">Static frontend hosting with custom domain and continuous deployment.</span></li>
+      </ul>
+    </section>
+
+    <section class="content-section">
+      <h2 id="h-roadmap">Roadmap</h2>
+      <ul class="roadmap-list" id="roadmap-list">
+        <li id="road-1">Kurdish TTS narration when high-quality Kurmanji voices become available</li>
+        <li id="road-2">More news sources beyond BBC, DW, and Al Jazeera</li>
+        <li id="road-3">Event-driven architecture for real-time breaking news</li>
+        <li id="road-4">Community contributions for translation quality review</li>
+        <li id="road-5">Regional dialect support (Sorani, Zazaki)</li>
+      </ul>
+    </section>
+
+    <a href="/" class="back-link" id="back-link">&larr; Back to today's briefing</a>
+  </main>
+
+  <footer>
+    <div class="container">
+      <nav class="footer-nav" aria-label="Footer navigation">
+        <a href="/">Home</a>
+        <a href="/about">About</a>
+        <a href="/how-it-works">How It Works</a>
+      </nav>
+      <div class="footer-services">
+        <span class="service-badge">Bedrock</span>
+        <span class="service-badge">Polly</span>
+        <span class="service-badge">Lambda</span>
+        <span class="service-badge">DynamoDB</span>
+        <span class="service-badge">EventBridge</span>
+        <span class="service-badge">S3</span>
+        <span class="service-badge">Amplify</span>
+      </div>
+      <p class="footer-tagline">Inspired by the dengbêj tradition · Built on AWS</p>
+    </div>
+  </footer>
+
+  <script>
+    (function() {
+      "use strict";
+
+      var currentLang = sessionStorage.getItem("dengbej-lang") || "en";
+      var btnEn = document.getElementById("btn-en");
+      var btnKu = document.getElementById("btn-ku");
+
+      var translations = {
+        "page-title": { en: "About Dengb\u00EAj", ku: "Der bar\u00EA Dengb\u00EAj" },
+        "page-subtitle": { en: "The story behind the storyteller.", ku: "\u00C7\u00EEroka li pey dengb\u00EAj." },
+        "h-dengbej": { en: "What is a Dengb\u00EAj?", ku: "Dengb\u00EAj \u00E7i ye?" },
+        "p-dengbej-1": {
+          en: "A dengb\u00EAj is a traditional Kurdish oral storyteller. For generations, dengb\u00EAjs have been the voice of their communities \u2014 recounting histories, delivering news from distant villages, and preserving collective memory through song and spoken word.",
+          ku: "Dengb\u00EAj \u00E7\u00EErokb\u00EAj\u00EAk\u00EE dev\u00EE y\u00EA kevne\u015Fop\u00EE y\u00EA Kurd e. Bi nifan, dengb\u00EAjan dengê civat\u00EAn xwe b\u00FBne \u2014 d\u00EErok vegot, n\u00FB\u00E7ey\u00EAn gund\u00EAn d\u00FBr dan \u00FB b\u00EEranîna civakî bi stran \u00FB gotin parastin."
+        },
+        "p-dengbej-2": {
+          en: "The dengb\u00EAj tradition is particularly strong in the Kurmanji-speaking regions. Without written archives, these storytellers carried entire histories in their voices, performing in gathering houses called \u201Cd\u00EEwanxane\u201D where communities would come together to listen.",
+          ku: "Kevne\u015Fopiya dengb\u00EAj\u00EE bi taybetî li herêm\u00EAn Kurmancîaxêv xurt e. B\u00EA ar\u015F\u00EEv\u00EAn nivisandî, van \u00E7\u00EErokb\u00EAjan hemû d\u00EErok di deng\u00EA xwe de hilgirtin, li d\u00EEwanxaneyan \u2014 c\u00EEh\u00EAn civatê \u2014 pêvajo kirin."
+        },
+        "p-dengbej-3": {
+          en: "Today, as Kurdish language faces challenges in many regions, the dengb\u00EAj tradition represents both cultural resistance and continuity \u2014 a reminder that stories survive through telling.",
+          ku: "\u00CEro, dema ku zimanê Kurdî li gelek her\u00EAman bi ast\u00EAngiy\u00EAn re r\u00FB bi r\u00FB ye, kevne\u015Fopiya dengb\u00EAjî hem berxwedana \u00E7andî hem jî dom\u00EE temsîl dike."
+        },
+        "h-project": { en: "About This Project", ku: "Der barê v\u00EA Proje" },
+        "p-project-1": {
+          en: "Dengb\u00EAj AI uses generative AI to create Kurdish news radio programs from current events. It fetches global news, summarizes and translates stories into Kurdish Kurmanji, and generates audio narration \u2014 all automatically, twice daily.",
+          ku: "Dengb\u00EAj AI bi AI-a afirîner bernam\u00EAn radyoya n\u00FB\u00E7ey\u00EAn Kurdî ji bûyer\u00EAn rojane \u00E7\u00EAdike. Ew n\u00FB\u00E7ey\u00EAn cîhanî digire, kurt dike û bi Kurmancî werdig\u00EAre, û deng\u00EA vegotinê çêdike \u2014 hemû bi ot\u00EAmatîk, du caran rojane."
+        },
+        "p-project-2": {
+          en: "Built for the AWS 10,000 AIdeas Weekend Challenge, this project demonstrates how serverless architecture and foundation models can serve under-resourced languages and preserve cultural traditions in new forms.",
+          ku: "Ji bo Pêşbaziya AWS 10,000 AIdeas hat\u00EE avakirin, ev proje n\u00EE\u015Fan dide ku mîmariya serverless û model\u00EAn bin\u00EAretî \u00E7awa dikarin xizmet\u00EA zimanan kêm-\u00E7avkanî bikin \u00FB kevne\u015Fopiy\u00EAn \u00E7andî bi form\u00EAn nû bipar\u00EAzin."
+        },
+        "h-services": { en: "AWS Services Used", ku: "Xizmet\u00EAn AWS" },
+        "h-roadmap": { en: "Roadmap", ku: "Nexşeya R\u00EAyê" },
+        "road-1": { en: "Kurdish TTS narration when high-quality Kurmanji voices become available", ku: "Deng\u00EA TTS\u00EA Kurdî dema ku deng\u00EAn Kurmancî y\u00EAn kal\u00EEte derkevin" },
+        "road-2": { en: "More news sources beyond BBC, DW, and Al Jazeera", ku: "B\u00EAtir \u00E7avkaniy\u00EAn n\u00FB\u00E7eyan ji bilî BBC, DW, û Al Jazeera" },
+        "road-3": { en: "Event-driven architecture for real-time breaking news", ku: "M\u00EEmariya li gorî bûyer\u00EAn ji bo nûçeyên tavilê" },
+        "road-4": { en: "Community contributions for translation quality review", ku: "Beşdariya civakê ji bo kontrola kalîteya wergerê" },
+        "road-5": { en: "Regional dialect support (Sorani, Zazaki)", ku: "Piştgiriya devokên herêmî (Soranî, Zazakî)" },
+        "back-link": { en: "\u2190 Back to today\u2019s briefing", ku: "\u2190 Vegere nûçeyên îro" }
+      };
+
+      function setLanguage(lang) {
+        currentLang = lang;
+        sessionStorage.setItem("dengbej-lang", lang);
+        btnEn.setAttribute("aria-pressed", String(lang === "en"));
+        btnKu.setAttribute("aria-pressed", String(lang === "ku"));
+        document.documentElement.lang = lang === "ku" ? "ku" : "en";
+
+        Object.keys(translations).forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el && translations[id][lang]) {
+            el.textContent = translations[id][lang];
+          }
+        });
+      }
+
+      btnEn.addEventListener("click", function() { setLanguage("en"); });
+      btnKu.addEventListener("click", function() { setLanguage("ku"); });
+
+      setLanguage(currentLang);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How Dengbêj Works</title>
+  <meta name="description" content="The serverless pipeline behind Dengbêj AI — from RSS feeds to Kurdish news radio.">
+  <style>
+    :root {
+      --text-primary: #111; --text-secondary: #444; --text-muted: #777;
+      --bg-page: #faf9f7; --bg-listen: #f5f0ea; --bg-card: #fff;
+      --accent: #7a3b10; --accent-hover: #5c2d0c; --accent-light: #f5ede4;
+      --border: #e5e0d8; --link: #1a4a8a; --link-hover: #0d3266;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Georgia, 'Times New Roman', serif;
+      background: var(--bg-page); color: var(--text-primary);
+      line-height: 1.7; -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 700px; margin: 0 auto; padding: 0 1.25rem; }
+
+    /* ── Header ── */
+    header { padding: 1.5rem 0 1.25rem; border-bottom: 1px solid var(--border); }
+    .header-inner { display: flex; justify-content: space-between; align-items: center; }
+    .wordmark {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 1.3rem; font-weight: 700; letter-spacing: 0.18em; color: var(--text-primary);
+    }
+    .wordmark-link { text-decoration: none; }
+    .site-nav {
+      display: flex; gap: 1.25rem;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.8rem;
+    }
+    .site-nav a {
+      color: var(--text-secondary); text-decoration: none; font-weight: 500;
+      transition: color 0.15s ease;
+    }
+    .site-nav a:hover { color: var(--accent); }
+    .site-nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .lang-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+    .lang-toggle button {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.78rem; padding: 0.35rem 0.75rem; border: none;
+      background: transparent; color: var(--text-secondary); cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .lang-toggle button:hover { background: var(--accent-light); }
+    .lang-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .lang-toggle button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+
+    /* ── Content ── */
+    .page-title {
+      font-size: 1.8rem; font-weight: 700; margin: 2.5rem 0 0.5rem; line-height: 1.3;
+    }
+    .page-subtitle {
+      font-size: 1rem; color: var(--text-secondary); margin-bottom: 2.5rem;
+    }
+
+    /* ── Pipeline Diagram ── */
+    .pipeline { display: flex; flex-direction: column; align-items: center; gap: 0; margin-bottom: 3rem; }
+    .pipeline-step {
+      width: 100%; max-width: 420px; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem;
+      text-align: center; position: relative;
+    }
+    .pipeline-step-name {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.92rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem;
+    }
+    .pipeline-step-service {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--accent); margin-bottom: 0.25rem;
+    }
+    .pipeline-step-desc {
+      font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;
+    }
+    .pipeline-arrow {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 0.4rem 0; color: var(--border);
+      font-size: 1.2rem; line-height: 1;
+    }
+    .pipeline-arrow-label {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.68rem; color: var(--text-muted); margin-bottom: 0.2rem;
+    }
+
+    /* ── Timing Section ── */
+    .timing-section { margin-bottom: 3rem; }
+    .timing-section h2 {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 0.75rem;
+    }
+    .timing-section p {
+      font-size: 1rem; color: var(--text-secondary); line-height: 1.8; margin-bottom: 1rem;
+    }
+
+    .back-link {
+      display: inline-block; margin-top: 1rem; margin-bottom: 3rem;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.85rem; color: var(--link); text-decoration: none; font-weight: 500;
+    }
+    .back-link:hover { color: var(--link-hover); text-decoration: underline; }
+    .back-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border); padding: 1.75rem 0 3rem;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.75rem; color: var(--text-muted); text-align: center; line-height: 1.8;
+    }
+    .footer-nav {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .footer-nav a { color: var(--text-muted); text-decoration: none; font-weight: 500; }
+    .footer-nav a:hover { color: var(--accent); text-decoration: underline; }
+    .footer-nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .footer-services {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem;
+      margin-bottom: 0.75rem;
+    }
+    .service-badge {
+      display: inline-block; padding: 0.2rem 0.55rem;
+      border: 1px solid var(--border); border-radius: 3px;
+      font-size: 0.68rem; color: var(--text-secondary); background: var(--bg-page);
+    }
+    .footer-tagline { color: var(--text-muted); font-style: italic; }
+
+    /* ── Responsive ── */
+    @media (max-width: 599px) {
+      .site-nav { display: none; }
+      .page-title { font-size: 1.5rem; }
+      .pipeline-step { padding: 0.85rem 1rem; }
+      .pipeline-step-name { font-size: 0.85rem; }
+      .pipeline-step-desc { font-size: 0.8rem; }
+    }
+    @media (min-width: 600px) and (max-width: 899px) { .container { padding: 0 2rem; } }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="header-inner">
+        <a href="/" class="wordmark-link" aria-label="Dengbêj home"><h1 class="wordmark">DENGBÊJ</h1></a>
+        <nav class="site-nav" aria-label="Main navigation">
+          <a href="/">Home</a>
+          <a href="/about">About</a>
+          <a href="/how-it-works">How It Works</a>
+        </nav>
+        <nav class="lang-toggle" aria-label="Language selection">
+          <button type="button" id="btn-en" aria-pressed="true">English</button>
+          <button type="button" id="btn-ku" aria-pressed="false">Kurdî</button>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <h1 class="page-title" id="page-title">How Dengbêj Works</h1>
+    <p class="page-subtitle" id="page-subtitle">A fully serverless AI pipeline from news feeds to Kurdish radio.</p>
+
+    <div class="pipeline" role="img" aria-label="Pipeline diagram showing the flow from RSS feeds to frontend">
+
+      <div class="pipeline-step">
+        <div class="pipeline-step-service">RSS Feeds</div>
+        <div class="pipeline-step-name" id="step-1-name">News Sources</div>
+        <div class="pipeline-step-desc" id="step-1-desc">BBC, Deutsche Welle, Al Jazeera, and other international sources.</div>
+      </div>
+      <div class="pipeline-arrow"><span class="pipeline-arrow-label" id="arrow-1">every 6 hours</span><span aria-hidden="true">&#8595;</span></div>
+
+      <div class="pipeline-step">
+        <div class="pipeline-step-service">Lambda</div>
+        <div class="pipeline-step-name" id="step-2-name">News Ingester</div>
+        <div class="pipeline-step-desc" id="step-2-desc">Fetches and parses RSS feeds, deduplicates articles, extracts metadata.</div>
+      </div>
+      <div class="pipeline-arrow"><span aria-hidden="true">&#8595;</span></div>
+
+      <div class="pipeline-step">
+        <div class="pipeline-step-service">DynamoDB</div>
+        <div class="pipeline-step-name" id="step-3-name">Article Storage</div>
+        <div class="pipeline-step-desc" id="step-3-desc">Raw articles stored with source, timestamp, and feed metadata.</div>
+      </div>
+      <div class="pipeline-arrow"><span class="pipeline-arrow-label" id="arrow-2">twice daily</span><span aria-hidden="true">&#8595;</span></div>
+
+      <div class="pipeline-step">
+        <div class="pipeline-step-service">Lambda + Bedrock</div>
+        <div class="pipeline-step-name" id="step-4-name">Today's 5 Curator</div>
+        <div class="pipeline-step-desc" id="step-4-desc">AI selects the five most important stories based on global significance and diversity.</div>
+      </div>
+      <div class="pipeline-arrow"><span aria-hidden="true">&#8595;</span></div>
+
+      <div class="pipeline-step">
+        <div class="pipeline-step-service">DynamoDB</div>
+        <div class="pipeline-step-name" id="step-5-name">Briefing Storage</div>
+        <div class="pipeline-step-desc" id="step-5-desc">Curated briefings stored with date keys for daily retrieval.</div>
+      </div>
+      <div class="pipeline-arrow"><span class="pipeline-arrow-label" id="arrow-3">15 min later</span><span aria-hidden="true">&#8595;</span></div>
+
+      <div class="pipeline-step">
+        <div class="pipeline-step-service">Lambda + Bedrock</div>
+        <div class="pipeline-step-name" id="step-6-name">Story Processor</div>
+        <div class="pipeline-step-desc" id="step-6-desc">Generates English summaries and Kurdish Kurmanji translations for each story.</div>
+      </div>
+      <div class="pipeline-arrow"><span aria-hidden="true">&#8595;</span></div>
+
+      <div class="pipeline-step">
+        <div class="pipeline-step-service">Lambda + Bedrock</div>
+        <div class="pipeline-step-name" id="step-7-name">Program Generator</div>
+        <div class="pipeline-step-desc" id="step-7-desc">Classifies stories into regional programs and generates broadcast scripts.</div>
+      </div>
+      <div class="pipeline-arrow"><span aria-hidden="true">&#8595;</span></div>
+
+      <div class="pipeline-step">
+        <div class="pipeline-step-service">Lambda + Bedrock + Polly</div>
+        <div class="pipeline-step-name" id="step-8-name">Daily Audio</div>
+        <div class="pipeline-step-desc" id="step-8-desc">Generates a narration script and synthesizes English audio via Amazon Polly.</div>
+      </div>
+      <div class="pipeline-arrow"><span aria-hidden="true">&#8595;</span></div>
+
+      <div class="pipeline-step">
+        <div class="pipeline-step-service">S3</div>
+        <div class="pipeline-step-name" id="step-9-name">Audio Storage</div>
+        <div class="pipeline-step-desc" id="step-9-desc">MP3 files stored in S3 with public read access for streaming.</div>
+      </div>
+      <div class="pipeline-arrow"><span aria-hidden="true">&#8595;</span></div>
+
+      <div class="pipeline-step">
+        <div class="pipeline-step-service">Lambda</div>
+        <div class="pipeline-step-name" id="step-10-name">News API</div>
+        <div class="pipeline-step-desc" id="step-10-desc">REST API serving today's briefing, programs, and audio URLs to the frontend.</div>
+      </div>
+      <div class="pipeline-arrow"><span aria-hidden="true">&#8595;</span></div>
+
+      <div class="pipeline-step">
+        <div class="pipeline-step-service">Amplify</div>
+        <div class="pipeline-step-name" id="step-11-name">Frontend</div>
+        <div class="pipeline-step-desc" id="step-11-desc">Static HTML/JS app with bilingual UI, program selector, and audio player.</div>
+      </div>
+    </div>
+
+    <section class="timing-section">
+      <h2 id="h-timing">Pipeline Timing</h2>
+      <p id="p-timing-1">Every 6 hours, fresh articles are ingested from international RSS feeds. Twice daily at 06:00 and 18:00 UTC, the AI curator selects the five most important stories for the day's briefing.</p>
+      <p id="p-timing-2">Fifteen minutes after curation, the story processor generates summaries and Kurdish translations. The program generator then classifies stories into regional programs and creates broadcast scripts. Finally, the audio pipeline synthesizes English narration and stores it for streaming.</p>
+      <p id="p-timing-3">The entire pipeline is orchestrated by Amazon EventBridge schedules, with each stage running as an independent Lambda function. No servers to manage, no infrastructure to maintain.</p>
+    </section>
+
+    <a href="/" class="back-link" id="back-link">&larr; Back to today's briefing</a>
+  </main>
+
+  <footer>
+    <div class="container">
+      <nav class="footer-nav" aria-label="Footer navigation">
+        <a href="/">Home</a>
+        <a href="/about">About</a>
+        <a href="/how-it-works">How It Works</a>
+      </nav>
+      <div class="footer-services">
+        <span class="service-badge">Bedrock</span>
+        <span class="service-badge">Polly</span>
+        <span class="service-badge">Lambda</span>
+        <span class="service-badge">DynamoDB</span>
+        <span class="service-badge">EventBridge</span>
+        <span class="service-badge">S3</span>
+        <span class="service-badge">Amplify</span>
+      </div>
+      <p class="footer-tagline">Inspired by the dengbêj tradition · Built on AWS</p>
+    </div>
+  </footer>
+
+  <script>
+    (function() {
+      "use strict";
+
+      var currentLang = sessionStorage.getItem("dengbej-lang") || "en";
+      var btnEn = document.getElementById("btn-en");
+      var btnKu = document.getElementById("btn-ku");
+
+      var translations = {
+        "page-title": { en: "How Dengb\u00EAj Works", ku: "\u00C7awa Dengb\u00EAj dixebite" },
+        "page-subtitle": { en: "A fully serverless AI pipeline from news feeds to Kurdish radio.", ku: "Bor\u00EEya AI-\u00EA ya tam\u00EE serverless ji feed\u00EAn nûçeyan heta radyoya Kurdî." },
+        "step-1-name": { en: "News Sources", ku: "\u00C7avkaniy\u00EAn N\u00FB\u00E7eyan" },
+        "step-1-desc": { en: "BBC, Deutsche Welle, Al Jazeera, and other international sources.", ku: "BBC, Deutsche Welle, Al Jazeera, \u00FB \u00E7avkaniy\u00EAn din \u00EAn navneteweyî." },
+        "step-2-name": { en: "News Ingester", ku: "Daxistina N\u00FB\u00E7eyan" },
+        "step-2-desc": { en: "Fetches and parses RSS feeds, deduplicates articles, extracts metadata.", ku: "Feed\u00EAn RSS dixw\u00EEne, gotaran dubare dike, metadata derdixe." },
+        "step-3-name": { en: "Article Storage", ku: "Depoya Gotaran" },
+        "step-3-desc": { en: "Raw articles stored with source, timestamp, and feed metadata.", ku: "Gotar\u00EAn xav bi \u00E7avkanî, dem, \u00FB metadata t\u00EAn hilanîn." },
+        "step-4-name": { en: "Today\u2019s 5 Curator", ku: "Bijartina 5 N\u00FB\u00E7ey\u00EAn \u00CEro" },
+        "step-4-desc": { en: "AI selects the five most important stories based on global significance and diversity.", ku: "AI li gor giring\u00EE \u00FB c\u00EBreb\u00EBjiya cîhanî 5 n\u00FB\u00E7ey\u00EAn her\u00EE giring hildibij\u00EAre." },
+        "step-5-name": { en: "Briefing Storage", ku: "Depoya Berhevok\u00EAn" },
+        "step-5-desc": { en: "Curated briefings stored with date keys for daily retrieval.", ku: "Berhevok bi key\u00EAn rojane t\u00EAn hilanîn." },
+        "step-6-name": { en: "Story Processor", ku: "Pêvajoker\u00EA \u00C7\u00EErokan" },
+        "step-6-desc": { en: "Generates English summaries and Kurdish Kurmanji translations for each story.", ku: "Kurtey\u00EAn \u00CEngilîzî \u00FB werg\u00EAr\u00EAn Kurmancî bo her \u00E7\u00EErok\u00EA \u00E7\u00EAdike." },
+        "step-7-name": { en: "Program Generator", ku: "Çêkera Bernameyan" },
+        "step-7-desc": { en: "Classifies stories into regional programs and generates broadcast scripts.", ku: "N\u00FB\u00E7eyan li gorî herêman dabeş dike \u00FB niv\u00EEsara weşanê \u00E7\u00EAdike." },
+        "step-8-name": { en: "Daily Audio", ku: "Deng\u00EA Rojane" },
+        "step-8-desc": { en: "Generates a narration script and synthesizes English audio via Amazon Polly.", ku: "Niv\u00EEsara vegotinê \u00E7\u00EAdike \u00FB deng\u00EA \u00CEngilîzî bi Amazon Polly sentez dike." },
+        "step-9-name": { en: "Audio Storage", ku: "Depoya Deng" },
+        "step-9-desc": { en: "MP3 files stored in S3 with public read access for streaming.", ku: "Pel\u00EAn MP3 li S3-ê bi gihî\u015Ftina giştî ji bo streaming t\u00EAn hilanîn." },
+        "step-10-name": { en: "News API", ku: "API-ya N\u00FB\u00E7eyan" },
+        "step-10-desc": { en: "REST API serving today\u2019s briefing, programs, and audio URLs to the frontend.", ku: "API-ya REST ku berhevok, bernameyan, \u00FB URL\u00EAn dengî ji frontend re pêşkêş dike." },
+        "step-11-name": { en: "Frontend", ku: "R\u00FBpel" },
+        "step-11-desc": { en: "Static HTML/JS app with bilingual UI, program selector, and audio player.", ku: "Serlêdana HTML/JS ya statîk bi UI-ya duziman, hilbijartina bernameyan, û lêdera dengê." },
+        "arrow-1": { en: "every 6 hours", ku: "her 6 saetan" },
+        "arrow-2": { en: "twice daily", ku: "du caran rojane" },
+        "arrow-3": { en: "15 min later", ku: "15 hûrdem \u015Fûnda" },
+        "h-timing": { en: "Pipeline Timing", ku: "Dema Boriyê" },
+        "p-timing-1": {
+          en: "Every 6 hours, fresh articles are ingested from international RSS feeds. Twice daily at 06:00 and 18:00 UTC, the AI curator selects the five most important stories for the day\u2019s briefing.",
+          ku: "Her 6 saetan, gotar\u00EAn nû ji feed\u00EAn RSS\u00EA navneteweyî t\u00EAn xwendin. Du caran rojane di 06:00 \u00FB 18:00 UTC-ê de, kuratorê AI-ê 5 n\u00FB\u00E7ey\u00EAn her\u00EE giring ji bo berhevoka rojê hildibij\u00EAre."
+        },
+        "p-timing-2": {
+          en: "Fifteen minutes after curation, the story processor generates summaries and Kurdish translations. The program generator then classifies stories into regional programs and creates broadcast scripts. Finally, the audio pipeline synthesizes English narration and stores it for streaming.",
+          ku: "Panzdeh hûrdem piştî bijartinê, pêvajokerê çîrokan kurteyan û wergerên Kurdî çêdike. Paşê çêkera bernameyan nûçeyan li gorî herêman dabeş dike û nivîsarên weşanê çêdike. Di dawiyê de, boriya dengê vegotina Îngilîzî sentez dike û ji bo streaming hilîne."
+        },
+        "p-timing-3": {
+          en: "The entire pipeline is orchestrated by Amazon EventBridge schedules, with each stage running as an independent Lambda function. No servers to manage, no infrastructure to maintain.",
+          ku: "Hemû borî bi bernameya Amazon EventBridge tê rêvebirin, her qonaxa wek fonksiyoneke Lambda ya serbixwe dimeşe. Ne server hene ku bên birêvebirin, ne jî binesazî heye ku bê parastin."
+        },
+        "back-link": { en: "\u2190 Back to today\u2019s briefing", ku: "\u2190 Vegere n\u00FB\u00E7ey\u00EAn îro" }
+      };
+
+      function setLanguage(lang) {
+        currentLang = lang;
+        sessionStorage.setItem("dengbej-lang", lang);
+        btnEn.setAttribute("aria-pressed", String(lang === "en"));
+        btnKu.setAttribute("aria-pressed", String(lang === "ku"));
+        document.documentElement.lang = lang === "ku" ? "ku" : "en";
+
+        Object.keys(translations).forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el && translations[id][lang]) {
+            el.textContent = translations[id][lang];
+          }
+        });
+      }
+
+      btnEn.addEventListener("click", function() { setLanguage("en"); });
+      btnKu.addEventListener("click", function() { setLanguage("ku"); });
+
+      setLanguage(currentLang);
+    })();
+  </script>
+</body>
+</html>
