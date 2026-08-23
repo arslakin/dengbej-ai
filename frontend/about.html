@@ -131,9 +131,9 @@
       <div class="header-inner">
         <a href="/" class="wordmark-link" aria-label="Dengbêj home"><h1 class="wordmark">DENGBÊJ</h1></a>
         <nav class="site-nav" aria-label="Main navigation">
-          <a href="/">Home</a>
-          <a href="/about">About</a>
-          <a href="/how-it-works">How It Works</a>
+          <a href="/" id="nav-home">Home</a>
+          <a href="/about" id="nav-about">About</a>
+          <a href="/how-it-works" id="nav-how">How It Works</a>
         </nav>
         <nav class="lang-toggle" aria-label="Language selection">
           <button type="button" id="btn-en" aria-pressed="true">English</button>
@@ -190,9 +190,9 @@
   <footer>
     <div class="container">
       <nav class="footer-nav" aria-label="Footer navigation">
-        <a href="/">Home</a>
-        <a href="/about">About</a>
-        <a href="/how-it-works">How It Works</a>
+        <a href="/" id="footer-home">Home</a>
+        <a href="/about" id="footer-about">About</a>
+        <a href="/how-it-works" id="footer-how">How It Works</a>
       </nav>
       <div class="footer-services">
         <span class="service-badge">Bedrock</span>
@@ -203,7 +203,7 @@
         <span class="service-badge">S3</span>
         <span class="service-badge">Amplify</span>
       </div>
-      <p class="footer-tagline">Inspired by the dengbêj tradition · Built on AWS</p>
+      <p class="footer-tagline" id="footer-tagline">Inspired by the dengbêj tradition · Built on AWS</p>
     </div>
   </footer>
 
@@ -247,7 +247,14 @@
         "road-3": { en: "Event-driven architecture for real-time breaking news", ku: "M\u00EEmariya li gorî bûyer\u00EAn ji bo nûçeyên tavilê" },
         "road-4": { en: "Community contributions for translation quality review", ku: "Beşdariya civakê ji bo kontrola kalîteya wergerê" },
         "road-5": { en: "Regional dialect support (Sorani, Zazaki)", ku: "Piştgiriya devokên herêmî (Soranî, Zazakî)" },
-        "back-link": { en: "\u2190 Back to today\u2019s briefing", ku: "\u2190 Vegere nûçeyên îro" }
+        "back-link": { en: "\u2190 Back to today\u2019s briefing", ku: "\u2190 Vegere nûçeyên îro" },
+        "nav-home": { en: "Home", ku: "Destp\u00EAk" },
+        "nav-about": { en: "About", ku: "Der bar\u00EA" },
+        "nav-how": { en: "How It Works", ku: "\u00C7awa dixebite" },
+        "footer-home": { en: "Home", ku: "Destp\u00EAk" },
+        "footer-about": { en: "About", ku: "Der bar\u00EA" },
+        "footer-how": { en: "How It Works", ku: "\u00C7awa dixebite" },
+        "footer-tagline": { en: "Inspired by the dengb\u00EAj tradition \u00B7 Built on AWS", ku: "Ji kevne\u015Fopiya dengb\u00EAjî hatiye ilhamkirin \u00B7 Li ser AWS-\u00EA hatiye avakirin" }
       };
 
       function setLanguage(lang) {
