@@ -88,7 +88,7 @@
     .program-btn:hover { border-color: var(--accent); color: var(--accent); }
     .program-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .program-btn[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .program-btn[data-available="false"] { opacity: 0.5; }
+    .program-btn[data-available="false"] { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
     .beje-row { display: flex; align-items: center; gap: 1rem; }
     .beje-btn {
       font-family: Georgia, serif; font-size: 1.1rem; font-weight: 700;
@@ -547,16 +547,25 @@
           var label = currentLang === "ku" ? prog.label_ku : prog.label_en;
           var selected = prog.id === selectedProgram;
           var available = programAvailability[prog.id] !== false;
-          html += '<button type="button" class="program-btn" role="radio" aria-checked="' + selected + '" data-program="' + prog.id + '" data-available="' + available + '">' + escapeHtml(label) + '</button>';
+          var disabledAttr = available ? "" : " disabled aria-disabled=\"true\"";
+          html += '<button type="button" class="program-btn" role="radio" aria-checked="' + selected + '" data-program="' + prog.id + '" data-available="' + available + '"' + disabledAttr + '>' + escapeHtml(label) + '</button>';
         });
         programChoices.innerHTML = html;
         programChoices.querySelectorAll(".program-btn").forEach(function(btn) {
           btn.addEventListener("click", function() {
+            if (btn.disabled) return;
             selectedProgram = btn.getAttribute("data-program");
             renderPrograms();
             updateBejeButton();
           });
         });
+
+        // If currently selected program became unavailable, fall back to "today"
+        if (programAvailability[selectedProgram] === false && selectedProgram !== "today") {
+          selectedProgram = "today";
+          renderPrograms();
+          updateBejeButton();
+        }
       }
 
       function updateBejeButton() {
@@ -619,7 +628,9 @@
       }
 
       function showEmpty() {
-        var msg = currentLang === "ku" ? "Niha n\u00FB\u00E7ey\u00EAn v\u00EA bernam\u00EAy\u00EA n\u00EEn in." : "No stories available for this program.";
+        var msg = currentLang === "ku"
+          ? "Di n\u00FB\u00E7ey\u00EAn niha de t\u00EA de nîne ku ji v\u00EA bernam\u00EAy\u00EA re guncan be. Bernameyeke din hilbij\u00EAre."
+          : "No relevant stories match this program in the current news cycle. Try another program.";
         storiesContainer.innerHTML = '<div class="state-container"><p>' + escapeHtml(msg) + '</p></div>';
       }
 
@@ -741,7 +752,9 @@
         if (storyCount === 0 && stories.length === 0) {
           html += '<div class="radio-card-empty">';
           html += '<p class="empty-ku">Niha n\u00FB\u00E7ey\u00EAn v\u00EA bernam\u00EAy\u00EA n\u00EEn in.</p>';
-          html += '<p>No stories available for this program.</p>';
+          html += '<p>' + (currentLang === "ku"
+            ? "Di n\u00FB\u00E7ey\u00EAn niha de t\u00EA de nîne ku ji v\u00EA bernam\u00EAy\u00EA re guncan be. Bernameyeke din hilbij\u00EAre."
+            : "No relevant stories match this program in the current news cycle. Try another program.") + '</p>';
           html += '</div>';
         } else {
           html += '<div class="radio-card-header">';
