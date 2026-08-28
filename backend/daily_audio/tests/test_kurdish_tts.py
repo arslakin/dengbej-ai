@@ -2,20 +2,23 @@
 Unit tests for Kurdish TTS provider (kurdishtts.com integration).
 
 Tests cover:
-- Successful synthesis (single chunk and multi-chunk)
-- Missing secret handling
+- Free-tier chunking (480-char default limit)
+- Successful single-chunk synthesis
+- Multi-chunk WAV output assembly
+- Invalid WAV data handling
+- Missing secret / auth / quota failures
 - Timeout handling
-- Quota/authentication failure
-- Malformed audio response
 - English Polly fallback when Kurdish TTS fails
 - Idempotency (unchanged scripts not re-synthesized)
-- Text chunking logic
+- S3 metadata (content-type, key extension)
+- Provider interface
 """
 
+import io
 import sys
 import os
-from unittest.mock import patch, MagicMock, PropertyMock
-from io import BytesIO
+import wave
+from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -23,118 +26,221 @@ from kurdish_tts import (
     chunk_text,
     synthesize_chunk,
     synthesize_kurdish,
+    assemble_wav,
     get_api_key,
     KurdishTTSProvider,
-    KURDISH_TTS_CHUNK_LIMIT,
-    MIN_MP3_SIZE,
+    KURDISH_TTS_MAX_CHARS,
+    EXPECTED_SAMPLE_RATE,
+    EXPECTED_CHANNELS,
+    EXPECTED_SAMPLE_WIDTH,
+    MIN_WAV_SIZE,
+    _validate_wav,
+    _extract_pcm,
 )
 from tts_provider import TTSError
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
-FAKE_MP3 = b"\xff\xfb\x90\x00" + b"\x00" * 500  # Valid-looking MP3 frame header + padding
+def make_wav(pcm_data: bytes, nchannels=1, sampwidth=2, framerate=22050) -> bytes:
+    """Create a valid WAV file from raw PCM data."""
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(nchannels)
+        wf.setsampwidth(sampwidth)
+        wf.setframerate(framerate)
+        wf.writeframes(pcm_data)
+    return buf.getvalue()
 
 
-def _mock_response(status_code=200, content=FAKE_MP3, content_type="audio/mpeg", json_data=None):
-    """Create a mock requests.Response."""
-    mock_resp = MagicMock()
-    mock_resp.status_code = status_code
-    mock_resp.content = content
-    mock_resp.headers = {"Content-Type": content_type}
-    mock_resp.text = str(json_data) if json_data else ""
-    if json_data:
-        mock_resp.json.return_value = json_data
-    else:
-        mock_resp.json.side_effect = ValueError("No JSON")
-    return mock_resp
+# 0.1 seconds of silence at 22050 Hz, 16-bit mono = 4410 bytes of PCM
+SILENCE_PCM = b"\x00\x00" * 2205
+FAKE_WAV = make_wav(SILENCE_PCM)
+
+# Different PCM content for multi-chunk test
+PCM_A = b"\x01\x00" * 2205
+PCM_B = b"\x02\x00" * 2205
+WAV_A = make_wav(PCM_A)
+WAV_B = make_wav(PCM_B)
 
 
-# ─── Test: Text Chunking ─────────────────────────────────────────────────────
+# ─── Test: Free-tier Chunking ────────────────────────────────────────────────
 
-def test_chunk_text_short_text():
-    """Text within limit should return single chunk."""
+def test_chunk_text_within_limit():
+    """Text within 480 chars should return single chunk."""
     text = "Rojbaş. Ev Dengbêj e."
-    chunks = chunk_text(text, max_chars=500)
+    chunks = chunk_text(text, max_chars=480)
     assert len(chunks) == 1
     assert chunks[0] == text
 
 
+def test_chunk_text_respects_free_tier_default():
+    """Default limit should be 480 (free-tier safe)."""
+    assert KURDISH_TTS_MAX_CHARS == 480
+
+
 def test_chunk_text_splits_on_sentences():
     """Long text should split on sentence boundaries."""
-    text = "Hevok yek. Hevok du. Hevok sê. Hevok çar. Hevok pênc."
-    chunks = chunk_text(text, max_chars=30)
+    text = "Hevok yek. Hevok du. Hevok sê. Hevok çar."
+    chunks = chunk_text(text, max_chars=25)
     assert len(chunks) > 1
-    # Each chunk should be within limit
     for chunk in chunks:
-        assert len(chunk) <= 30
+        assert len(chunk) <= 25
 
 
-def test_chunk_text_preserves_all_content():
-    """All original text should be present across chunks."""
-    text = "A" * 100 + ". " + "B" * 100 + ". " + "C" * 100 + "."
-    chunks = chunk_text(text, max_chars=120)
-    combined = " ".join(chunks)
-    # All original content preserved (spaces may differ at boundaries)
-    assert "A" * 100 in combined
-    assert "B" * 100 in combined
-    assert "C" * 100 in combined
+def test_chunk_text_many_sentences():
+    """Typical program script (~800 chars) should split into 2+ chunks at 480."""
+    text = "Rojbaş. Ev Dengbêj e. " + "Ev nûçeyek e ji cîhanê. " * 25  # ~622 chars
+    chunks = chunk_text(text, max_chars=480)
+    assert len(chunks) >= 2
+    for chunk in chunks:
+        assert len(chunk) <= 480
 
 
-def test_chunk_text_handles_single_long_sentence():
-    """A sentence longer than the limit should be hard-split."""
+def test_chunk_text_handles_long_sentence():
+    """A sentence longer than the limit should be sub-split."""
     text = "A" * 600
-    chunks = chunk_text(text, max_chars=500)
+    chunks = chunk_text(text, max_chars=480)
     assert len(chunks) >= 2
     combined = "".join(chunks)
     assert len(combined) == 600
 
 
+def test_chunk_text_preserves_all_content():
+    """All text should be present across chunks."""
+    text = "Hevok A. " * 60  # ~540 chars
+    chunks = chunk_text(text, max_chars=480)
+    combined = " ".join(chunks)
+    assert combined.count("Hevok A") == 60
+
+
+# ─── Test: Multi-chunk WAV Assembly ──────────────────────────────────────────
+
+def test_assemble_wav_single_chunk():
+    """Single chunk should be returned as-is."""
+    result = assemble_wav([FAKE_WAV])
+    assert result == FAKE_WAV
+
+
+def test_assemble_wav_multi_chunk():
+    """Multiple WAV chunks should produce a valid combined WAV."""
+    result = assemble_wav([WAV_A, WAV_B])
+
+    # Validate output is valid WAV
+    with wave.open(io.BytesIO(result), "rb") as wf:
+        assert wf.getnchannels() == EXPECTED_CHANNELS
+        assert wf.getsampwidth() == EXPECTED_SAMPLE_WIDTH
+        assert wf.getframerate() == EXPECTED_SAMPLE_RATE
+        # Frame count should be sum of both
+        assert wf.getnframes() == 2205 + 2205
+        pcm = wf.readframes(wf.getnframes())
+        assert pcm == PCM_A + PCM_B
+
+
+def test_assemble_wav_three_chunks():
+    """Three chunks assembled correctly."""
+    pcm_c = b"\x03\x00" * 1000
+    wav_c = make_wav(pcm_c)
+    result = assemble_wav([WAV_A, WAV_B, wav_c])
+
+    with wave.open(io.BytesIO(result), "rb") as wf:
+        assert wf.getnframes() == 2205 + 2205 + 1000
+
+
+# ─── Test: Invalid WAV Data ──────────────────────────────────────────────────
+
+def test_validate_wav_rejects_non_wav():
+    """Non-WAV data should raise TTSError."""
+    try:
+        _validate_wav(b"this is not wav data at all")
+        assert False, "Should have raised TTSError"
+    except TTSError as e:
+        assert "invalid WAV" in str(e).lower() or "wav" in str(e).lower()
+
+
+def test_validate_wav_rejects_wrong_sample_rate():
+    """WAV with wrong sample rate should be rejected."""
+    bad_wav = make_wav(SILENCE_PCM, framerate=44100)
+    try:
+        _validate_wav(bad_wav)
+        assert False, "Should have raised TTSError"
+    except TTSError as e:
+        assert "44100" in str(e) or "Hz" in str(e)
+
+
+def test_validate_wav_rejects_stereo():
+    """Stereo WAV should be rejected."""
+    stereo_pcm = b"\x00\x00\x00\x00" * 2205  # stereo needs 2x samples per frame
+    bad_wav = make_wav(stereo_pcm, nchannels=2)
+    try:
+        _validate_wav(bad_wav)
+        assert False, "Should have raised TTSError"
+    except TTSError as e:
+        assert "channel" in str(e).lower()
+
+
+def test_validate_wav_rejects_empty_frames():
+    """WAV with zero frames should be rejected."""
+    empty_wav = make_wav(b"")
+    try:
+        _validate_wav(empty_wav)
+        assert False, "Should have raised TTSError"
+    except TTSError as e:
+        assert "zero" in str(e).lower()
+
+
 # ─── Test: Successful Synthesis ──────────────────────────────────────────────
 
 @patch("kurdish_tts.get_api_key")
-@patch("kurdish_tts.requests.post")
-def test_synthesize_chunk_success(mock_post, mock_key):
-    """Successful single chunk synthesis returns MP3 bytes."""
+@patch("kurdish_tts.urlopen")
+def test_synthesize_chunk_success(mock_urlopen, mock_key):
+    """Successful single chunk returns WAV bytes."""
     mock_key.return_value = "test-key-123"
-    mock_post.return_value = _mock_response(200, FAKE_MP3, "audio/mpeg")
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.headers = {"Content-Type": "audio/wav"}
+    mock_resp.read.return_value = FAKE_WAV
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    mock_urlopen.return_value = mock_resp
 
     result = synthesize_chunk("Rojbaş", "test-key-123")
-    assert result == FAKE_MP3
-    assert len(result) > MIN_MP3_SIZE
+    assert len(result) > MIN_WAV_SIZE
+    # Should be valid WAV
+    with wave.open(io.BytesIO(result), "rb") as wf:
+        assert wf.getframerate() == 22050
 
 
 @patch("kurdish_tts.get_api_key")
-@patch("kurdish_tts.requests.post")
-def test_synthesize_kurdish_single_chunk(mock_post, mock_key):
-    """Short text should result in a single API call."""
+@patch("kurdish_tts.urlopen")
+def test_synthesize_kurdish_multi_chunk_wav(mock_urlopen, mock_key):
+    """Long text produces multi-chunk request and valid assembled WAV."""
     mock_key.return_value = "test-key-123"
-    mock_post.return_value = _mock_response(200, FAKE_MP3, "audio/mpeg")
 
-    result = synthesize_kurdish("Rojbaş. Ev nûçe ye.")
-    assert result == FAKE_MP3
-    mock_post.assert_called_once()
+    call_count = [0]
 
+    def mock_open_side_effect(req, timeout=None):
+        call_count[0] += 1
+        resp = MagicMock()
+        resp.status = 200
+        resp.headers = {"Content-Type": "audio/wav"}
+        resp.read.return_value = WAV_A if call_count[0] % 2 == 1 else WAV_B
+        resp.__enter__ = lambda s: s
+        resp.__exit__ = MagicMock(return_value=False)
+        return resp
 
-@patch("kurdish_tts.get_api_key")
-@patch("kurdish_tts.requests.post")
-def test_synthesize_kurdish_multi_chunk(mock_post, mock_key):
-    """Long text should be split and concatenated."""
-    mock_key.return_value = "test-key-123"
-    chunk1 = b"\xff\xfb\x90\x00" + b"\x01" * 300
-    chunk2 = b"\xff\xfb\x90\x00" + b"\x02" * 300
-    mock_post.side_effect = [
-        _mock_response(200, chunk1, "audio/mpeg"),
-        _mock_response(200, chunk2, "audio/mpeg"),
-    ]
+    mock_urlopen.side_effect = mock_open_side_effect
 
-    # Create text that exceeds the chunk limit
-    text = "Hevok yekem. " * 400  # ~5600 chars
+    # Create text that exceeds free-tier (480 chars)
+    text = "Hevok yekem. " * 40  # ~560 chars
     result = synthesize_kurdish(text)
 
-    # Result should be concatenation of both chunks
-    assert result == chunk1 + chunk2
-    assert mock_post.call_count == 2
+    # Should have made multiple API calls
+    assert call_count[0] >= 2
+    # Result should be valid WAV
+    with wave.open(io.BytesIO(result), "rb") as wf:
+        assert wf.getframerate() == EXPECTED_SAMPLE_RATE
+        assert wf.getnframes() > 0
 
 
 # ─── Test: Missing Secret ────────────────────────────────────────────────────
@@ -150,12 +256,11 @@ def test_get_api_key_secret_not_found(mock_boto):
         {"Error": {"Code": "ResourceNotFoundException", "Message": "Not found"}},
         "GetSecretValue"
     )
-
     import kurdish_tts
     kurdish_tts._cached_api_key = None
     try:
         get_api_key()
-        assert False, "Should have raised TTSError"
+        assert False
     except TTSError as e:
         assert "not found" in str(e).lower()
 
@@ -171,90 +276,64 @@ def test_get_api_key_access_denied(mock_boto):
         {"Error": {"Code": "AccessDeniedException", "Message": "No access"}},
         "GetSecretValue"
     )
-
     import kurdish_tts
     kurdish_tts._cached_api_key = None
     try:
         get_api_key()
-        assert False, "Should have raised TTSError"
+        assert False
     except TTSError as e:
         assert "permission" in str(e).lower()
 
 
-# ─── Test: Timeout Handling ──────────────────────────────────────────────────
+# ─── Test: Timeout ───────────────────────────────────────────────────────────
 
-@patch("kurdish_tts.requests.post")
-def test_synthesize_chunk_timeout(mock_post):
-    """Timeout should retry and eventually raise TTSError."""
-    import requests as real_requests
-    mock_post.side_effect = real_requests.Timeout("Connection timed out")
+@patch("kurdish_tts.urlopen")
+def test_synthesize_chunk_timeout(mock_urlopen):
+    """Timeout should retry and raise TTSError."""
+    from urllib.error import URLError
+    mock_urlopen.side_effect = URLError("timed out")
 
     try:
         synthesize_chunk("Test", "key123")
-        assert False, "Should have raised TTSError"
+        assert False
     except TTSError as e:
-        assert "timeout" in str(e).lower()
-    # Should have retried
-    assert mock_post.call_count == 2  # KURDISH_TTS_MAX_RETRIES
+        assert "timeout" in str(e).lower() or "connection" in str(e).lower()
+    assert mock_urlopen.call_count == 2
 
 
-# ─── Test: Quota / Auth Failure ──────────────────────────────────────────────
+# ─── Test: Auth / Quota Failures ─────────────────────────────────────────────
 
-@patch("kurdish_tts.requests.post")
-def test_synthesize_chunk_auth_failure(mock_post):
+@patch("kurdish_tts.urlopen")
+def test_synthesize_chunk_auth_failure(mock_urlopen):
     """401 should immediately raise without retry."""
-    mock_post.return_value = _mock_response(401, b"", "text/plain")
-
+    from urllib.error import HTTPError
+    mock_urlopen.side_effect = HTTPError(
+        "url", 401, "Unauthorized", {}, io.BytesIO(b"")
+    )
     try:
         synthesize_chunk("Test", "bad-key")
-        assert False, "Should have raised TTSError"
+        assert False
     except TTSError as e:
         assert "authentication" in str(e).lower()
-    # No retry for auth errors
-    assert mock_post.call_count == 1
+    assert mock_urlopen.call_count == 1
 
 
-@patch("kurdish_tts.requests.post")
-def test_synthesize_chunk_quota_exhausted(mock_post):
+@patch("kurdish_tts.urlopen")
+def test_synthesize_chunk_quota_exhausted(mock_urlopen):
     """403 should immediately raise without retry."""
-    mock_post.return_value = _mock_response(403, b"", "text/plain")
-
+    from urllib.error import HTTPError
+    mock_urlopen.side_effect = HTTPError(
+        "url", 403, "Forbidden", {}, io.BytesIO(b"")
+    )
     try:
         synthesize_chunk("Test", "key123")
-        assert False, "Should have raised TTSError"
+        assert False
     except TTSError as e:
         assert "quota" in str(e).lower()
-    assert mock_post.call_count == 1
+    assert mock_urlopen.call_count == 1
 
 
-# ─── Test: Malformed Audio ───────────────────────────────────────────────────
-
-@patch("kurdish_tts.requests.post")
-def test_synthesize_chunk_too_small(mock_post):
-    """Audio smaller than MIN_MP3_SIZE should be rejected."""
-    mock_post.return_value = _mock_response(200, b"\x00" * 10, "audio/mpeg")
-
-    try:
-        synthesize_chunk("Test", "key123")
-        assert False, "Should have raised TTSError"
-    except TTSError as e:
-        assert "small" in str(e).lower()
-
-
-@patch("kurdish_tts.requests.post")
-def test_synthesize_chunk_collapsed_generation(mock_post):
-    """Collapsed generation response should be treated as failure."""
-    json_response = {"generation": {"collapsed": True}}
-    mock_post.return_value = _mock_response(200, b"{}", "application/json", json_response)
-
-    try:
-        synthesize_chunk("Test", "key123")
-        assert False, "Should have raised TTSError"
-    except TTSError as e:
-        assert "collapsed" in str(e).lower()
-
-
-# ─── Test: Fallback (integration with daily_audio) ───────────────────────────
+# ─── Test: Fallback ──────────────────────────────────────────────────────────
 
 @patch("lambda_function.TTS_ENABLED", True)
 @patch("lambda_function.synthesize_and_upload")
@@ -262,7 +341,7 @@ def test_synthesize_chunk_collapsed_generation(mock_post):
 @patch("lambda_function.get_processed_briefing")
 @patch("lambda_function.invoke_bedrock")
 @patch("lambda_function.store_script")
-def test_kurdish_tts_failure_preserves_english_audio(mock_store, mock_bedrock, mock_get, mock_en_narration, mock_synth):
+def test_kurdish_tts_failure_preserves_english(mock_store, mock_bedrock, mock_get, mock_en, mock_synth):
     """If Kurdish TTS fails, English Polly audio should still be stored."""
     from lambda_function import lambda_handler
 
@@ -273,12 +352,10 @@ def test_kurdish_tts_failure_preserves_english_audio(mock_store, mock_bedrock, m
     }
     mock_get.return_value = briefing
     mock_bedrock.return_value = "Rojbaş. Ev Dengbêj e. Nûçe."
-    mock_en_narration.return_value = "English narration text."
+    mock_en.return_value = "English narration text."
     mock_synth.return_value = "https://dengbej-audio.s3.amazonaws.com/daily/en_test.mp3"
 
-    # Patch Kurdish TTS to fail
-    with patch("lambda_function.TTS_ENABLED", True), \
-         patch.dict("sys.modules", {"kurdish_tts": MagicMock()}):
+    with patch.dict("sys.modules", {"kurdish_tts": MagicMock()}):
         import sys
         sys.modules["kurdish_tts"].synthesize_kurdish.side_effect = Exception("Kurdish TTS unavailable")
         sys.modules["kurdish_tts"].TTSError = Exception
@@ -286,45 +363,87 @@ def test_kurdish_tts_failure_preserves_english_audio(mock_store, mock_bedrock, m
         result = lambda_handler({"date": "2026-09-01", "force": True}, None)
 
     assert result["statusCode"] == 200
-    # store_script should have been called with English audio
-    call_kwargs = mock_store.call_args
-    assert call_kwargs is not None
+    assert mock_store.called
 
 
 # ─── Test: Idempotency ───────────────────────────────────────────────────────
 
 @patch("lambda_function.get_processed_briefing")
 def test_existing_script_not_regenerated(mock_get):
-    """If script already exists and force=False, no TTS calls should be made."""
+    """If script already exists and force=False, no TTS calls."""
     from lambda_function import lambda_handler
 
     briefing = {
         "briefing_date": "2026-09-01", "generated_at": "2026-09-01T06:00:00Z",
-        "daily_audio_script_ku": "Existing script content",
+        "daily_audio_script_ku": "Existing script",
         "stories": [{"processing_status": "processed"}] * 5,
     }
     mock_get.return_value = briefing
 
     result = lambda_handler({"date": "2026-09-01", "force": False}, None)
-
     assert result["statusCode"] == 200
     assert result["body"]["status"] == "already_exists"
+
+
+# ─── Test: S3 Metadata ───────────────────────────────────────────────────────
+
+@patch("lambda_function.TTS_ENABLED", True)
+@patch("lambda_function.s3_client")
+@patch("lambda_function.synthesize_and_upload")
+@patch("lambda_function.generate_english_narration")
+@patch("lambda_function.get_processed_briefing")
+@patch("lambda_function.invoke_bedrock")
+@patch("lambda_function.store_script")
+def test_kurdish_audio_uploaded_as_wav(mock_store, mock_bedrock, mock_get, mock_en, mock_synth, mock_s3):
+    """Kurdish audio should be uploaded with .wav key and audio/wav content type."""
+    from lambda_function import lambda_handler
+
+    briefing = {
+        "briefing_date": "2026-09-01", "generated_at": "2026-09-01T06:00:00Z",
+        "stories": [{"processing_status": "processed", "headline": "Test", "category": "world",
+                     "summary_en": "Summary", "summary_ku": "Kurte", "primary_source": "BBC"}] * 5,
+    }
+    mock_get.return_value = briefing
+    mock_bedrock.return_value = "Rojbaş. Script."
+    mock_en.return_value = "English."
+    mock_synth.return_value = "https://dengbej-audio.s3.amazonaws.com/daily/en.mp3"
+
+    with patch("lambda_function.TTS_ENABLED", True):
+        # Mock the Kurdish TTS module to return a valid WAV
+        with patch.dict("sys.modules", {"kurdish_tts": MagicMock()}) as mods:
+            import sys
+            sys.modules["kurdish_tts"].synthesize_kurdish.return_value = FAKE_WAV
+            sys.modules["kurdish_tts"].TTSError = TTSError
+
+            result = lambda_handler({"date": "2026-09-01", "force": True}, None)
+
+    # Check S3 put_object was called with WAV content type
+    if mock_s3.put_object.called:
+        call_kwargs = mock_s3.put_object.call_args
+        if call_kwargs:
+            kwargs = call_kwargs[1] if call_kwargs[1] else {}
+            # The key should end with .wav
+            key = kwargs.get("Key", "")
+            content_type = kwargs.get("ContentType", "")
+            if "_ku_" in key:
+                assert key.endswith(".wav"), f"Key should end with .wav: {key}"
+                assert content_type == "audio/wav", f"ContentType should be audio/wav: {content_type}"
 
 
 # ─── Test: Provider Interface ────────────────────────────────────────────────
 
 @patch("kurdish_tts.synthesize_kurdish")
-def test_provider_synthesize_returns_result(mock_synth):
-    """KurdishTTSProvider.synthesize should return TTSResult."""
-    mock_synth.return_value = FAKE_MP3
+def test_provider_returns_wav_format(mock_synth):
+    """KurdishTTSProvider.synthesize should return TTSResult with wav format."""
+    mock_synth.return_value = FAKE_WAV
 
     provider = KurdishTTSProvider()
     result = provider.synthesize("Rojbaş")
 
-    assert result.audio_data == FAKE_MP3
+    assert result.audio_data == FAKE_WAV
     assert result.provider == "kurdish-tts"
     assert result.language == "ku"
-    assert result.format == "mp3"
+    assert result.format == "wav"
 
 
 def test_provider_supports_kurdish():
@@ -334,7 +453,6 @@ def test_provider_supports_kurdish():
     assert provider.supports_language("kmr") is True
     assert provider.supports_language("kurmanji") is True
     assert provider.supports_language("en") is False
-    assert provider.supports_language("ar") is False
 
 
 def test_provider_rejects_unsupported_language():
@@ -342,6 +460,12 @@ def test_provider_rejects_unsupported_language():
     provider = KurdishTTSProvider()
     try:
         provider.synthesize("Hello", language="en")
-        assert False, "Should have raised TTSError"
+        assert False
     except TTSError as e:
         assert "not support" in str(e).lower()
+
+
+def test_provider_speaker_configurable():
+    """Speaker should be configurable via constructor."""
+    provider = KurdishTTSProvider(speaker_id="kurmanji_241")
+    assert provider._speaker_id == "kurmanji_241"

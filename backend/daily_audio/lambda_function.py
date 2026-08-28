@@ -132,8 +132,8 @@ def handle_today_script(target_date, force, telemetry):
             audio_data_ku = synthesize_kurdish(script)
             if audio_data_ku:
                 timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-                s3_key = f"daily/{target_date}_ku_{timestamp}.mp3"
-                s3_client.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=audio_data_ku, ContentType="audio/mpeg")
+                s3_key = f"daily/{target_date}_ku_{timestamp}.wav"
+                s3_client.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=audio_data_ku, ContentType="audio/wav")
                 audio_url_ku = f"https://{S3_BUCKET}.s3.amazonaws.com/{s3_key}"
                 print(f"Kurdish audio uploaded: {audio_url_ku}")
         except Exception as e:
@@ -226,8 +226,8 @@ def handle_program_script(program_id, target_date, force, telemetry):
             audio_data_ku = synthesize_kurdish(script)
             if audio_data_ku:
                 timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-                s3_key = f"programs/{program_id}/{target_date}_ku_{timestamp}.mp3"
-                s3_client.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=audio_data_ku, ContentType="audio/mpeg")
+                s3_key = f"programs/{program_id}/{target_date}_ku_{timestamp}.wav"
+                s3_client.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=audio_data_ku, ContentType="audio/wav")
                 audio_url_ku = f"https://{S3_BUCKET}.s3.amazonaws.com/{s3_key}"
                 print(f"Program Kurdish audio uploaded: {audio_url_ku}")
         except Exception as e:

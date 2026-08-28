@@ -1,23 +1,31 @@
 """
 KurdishTTS Provider — Kurmanji TTS via kurdishtts.com API.
 
-Synthesizes Kurmanji Kurdish text to MP3 audio using the KurdishTTS.com API.
+Synthesizes Kurmanji Kurdish text to WAV audio using the KurdishTTS.com API.
 Handles chunking for texts exceeding the API character limit, retrieves the
-API key from AWS Secrets Manager, and provides graceful fallback on failure.
+API key from AWS Secrets Manager, and assembles multi-chunk output into a
+single valid WAV file using Python's standard `wave` module.
+
+Uses only standard-library HTTP (urllib) so no external `requests` dependency
+is needed in the Lambda package.
 
 API docs: https://www.kurdishtts.com/docs/api
 Endpoint: POST https://www.kurdishtts.com/api/tts-proxy
 Auth: x-api-key header
+Output: WAV (PCM 16-bit, mono, 22050 Hz)
 """
 
+import io
 import json
 import os
 import re
 import time
+import wave
 from typing import Optional
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 import boto3
-import requests
 from botocore.exceptions import ClientError
 
 from tts_provider import TTSProvider, TTSResult, TTSError
@@ -31,12 +39,18 @@ KURDISH_TTS_SECRET_NAME = os.environ.get(
 )
 KURDISH_TTS_SPEAKER = os.environ.get("KURDISH_TTS_SPEAKER", "kurmanji_236")
 KURDISH_TTS_MODEL = os.environ.get("KURDISH_TTS_MODEL", "v4")
-KURDISH_TTS_CHUNK_LIMIT = int(os.environ.get("KURDISH_TTS_CHUNK_LIMIT", "4800"))
+# Free-tier limit is 500 chars; default to 480 for safety margin.
+KURDISH_TTS_MAX_CHARS = int(os.environ.get("KURDISH_TTS_MAX_CHARS", "480"))
 KURDISH_TTS_TIMEOUT = int(os.environ.get("KURDISH_TTS_TIMEOUT", "30"))
 KURDISH_TTS_MAX_RETRIES = int(os.environ.get("KURDISH_TTS_MAX_RETRIES", "2"))
 
-# Minimum valid MP3 frame size (an MP3 frame header is 4 bytes minimum)
-MIN_MP3_SIZE = 256
+# Expected WAV parameters from the API (22050 Hz, mono, 16-bit)
+EXPECTED_SAMPLE_RATE = 22050
+EXPECTED_CHANNELS = 1
+EXPECTED_SAMPLE_WIDTH = 2  # 16-bit = 2 bytes
+
+# Minimum valid WAV size (44-byte header + at least some PCM data)
+MIN_WAV_SIZE = 100
 
 
 # ─── Secret Retrieval ────────────────────────────────────────────────────────
@@ -87,36 +101,35 @@ def get_api_key() -> str:
 
 # ─── Text Chunking ───────────────────────────────────────────────────────────
 
-def chunk_text(text: str, max_chars: int = KURDISH_TTS_CHUNK_LIMIT) -> list:
+def chunk_text(text: str, max_chars: int = None) -> list:
     """
     Split text into chunks at sentence boundaries, respecting the API char limit.
 
     Strategy:
     1. Split on sentence-ending punctuation followed by whitespace
     2. If a single sentence exceeds the limit, split on clause boundaries (commas)
-    3. If still too long, hard-split at the limit (rare edge case)
+    3. If still too long, hard-split at the limit
     """
+    if max_chars is None:
+        max_chars = KURDISH_TTS_MAX_CHARS
+
     if len(text) <= max_chars:
         return [text]
 
-    # Split on sentence boundaries: period/question/exclamation followed by space or newline
+    # Split on sentence boundaries
     sentences = re.split(r'(?<=[.!?])\s+', text)
 
     chunks = []
     current_chunk = ""
 
     for sentence in sentences:
-        # If adding this sentence would exceed the limit
         if len(current_chunk) + len(sentence) + 1 > max_chars:
-            # Save current chunk if it has content
             if current_chunk.strip():
                 chunks.append(current_chunk.strip())
                 current_chunk = ""
 
-            # If the single sentence itself exceeds the limit, sub-split
             if len(sentence) > max_chars:
                 sub_parts = _split_long_sentence(sentence, max_chars)
-                # Add all sub-parts except the last as complete chunks
                 for part in sub_parts[:-1]:
                     chunks.append(part.strip())
                 current_chunk = sub_parts[-1]
@@ -136,7 +149,6 @@ def chunk_text(text: str, max_chars: int = KURDISH_TTS_CHUNK_LIMIT) -> list:
 
 def _split_long_sentence(text: str, max_chars: int) -> list:
     """Split a long sentence on commas or hard-break if necessary."""
-    # Try splitting on commas
     parts = text.split(", ")
     if len(parts) > 1:
         result = []
@@ -152,79 +164,99 @@ def _split_long_sentence(text: str, max_chars: int) -> list:
             result.append(current.strip())
         return result
 
-    # Hard split as last resort
     return [text[i:i + max_chars] for i in range(0, len(text), max_chars)]
 
 
-# ─── API Call ────────────────────────────────────────────────────────────────
+# ─── API Call (stdlib urllib) ────────────────────────────────────────────────
 
-def synthesize_chunk(text: str, api_key: str, speaker_id: str = KURDISH_TTS_SPEAKER) -> bytes:
+def synthesize_chunk(text: str, api_key: str, speaker_id: str = None) -> bytes:
     """
     Synthesize a single text chunk via the KurdishTTS API.
-    Returns raw MP3 bytes.
+    Returns raw WAV bytes.
 
     Raises TTSError on failure after retries.
     """
-    payload = {
+    if speaker_id is None:
+        speaker_id = KURDISH_TTS_SPEAKER
+
+    payload = json.dumps({
         "text": text,
         "speaker_id": speaker_id,
         "model_version": KURDISH_TTS_MODEL,
-        "format": "mp3",
-    }
+        "format": "wav",
+    }).encode("utf-8")
 
     last_error = None
     for attempt in range(1, KURDISH_TTS_MAX_RETRIES + 1):
         try:
-            response = requests.post(
+            req = Request(
                 KURDISH_TTS_ENDPOINT,
+                data=payload,
                 headers={
                     "x-api-key": api_key,
                     "Content-Type": "application/json",
                 },
-                json=payload,
-                timeout=KURDISH_TTS_TIMEOUT,
+                method="POST",
             )
+            with urlopen(req, timeout=KURDISH_TTS_TIMEOUT) as resp:
+                status = resp.status
+                content_type = resp.headers.get("Content-Type", "")
+                data = resp.read()
 
-            # Handle specific error codes
-            if response.status_code == 401:
+            if len(data) < MIN_WAV_SIZE:
+                raise TTSError(f"KurdishTTS returned suspiciously small audio: {len(data)} bytes")
+
+            # Check for collapsed generation in JSON response
+            if "application/json" in content_type:
+                try:
+                    json_body = json.loads(data)
+                    if json_body.get("generation", {}).get("collapsed"):
+                        raise TTSError("KurdishTTS returned collapsed generation (empty output)")
+                    raise TTSError(f"KurdishTTS unexpected JSON response: {str(json_body)[:200]}")
+                except (ValueError, AttributeError):
+                    raise TTSError(f"KurdishTTS unexpected content-type: {content_type}")
+
+            # Validate WAV header
+            _validate_wav(data)
+
+            return data
+
+        except HTTPError as e:
+            status = e.code
+            body = ""
+            try:
+                body = e.read().decode("utf-8", errors="replace")[:200]
+            except Exception:
+                pass
+
+            if status == 401:
                 raise TTSError("KurdishTTS authentication failed (invalid API key)")
-            elif response.status_code == 403:
+            elif status == 403:
                 raise TTSError("KurdishTTS quota exhausted or plan inactive")
-            elif response.status_code == 422:
-                raise TTSError(f"KurdishTTS validation error: {response.text[:200]}")
-            elif response.status_code != 200:
-                last_error = f"KurdishTTS HTTP {response.status_code}: {response.text[:100]}"
+            elif status == 422:
+                raise TTSError(f"KurdishTTS validation error: {body}")
+            else:
+                last_error = f"KurdishTTS HTTP {status}: {body}"
                 if attempt < KURDISH_TTS_MAX_RETRIES:
                     time.sleep(1 * attempt)
                     continue
                 raise TTSError(last_error)
 
-            # Validate response
-            content_type = response.headers.get("Content-Type", "")
-            if "audio" not in content_type and "octet-stream" not in content_type:
-                # Check for JSON error response
-                try:
-                    error_data = response.json()
-                    if error_data.get("generation", {}).get("collapsed"):
-                        raise TTSError("KurdishTTS returned collapsed generation (empty output)")
-                    raise TTSError(f"KurdishTTS unexpected response: {str(error_data)[:200]}")
-                except (ValueError, AttributeError):
-                    raise TTSError(f"KurdishTTS unexpected content-type: {content_type}")
-
-            audio_data = response.content
-            if len(audio_data) < MIN_MP3_SIZE:
-                raise TTSError(f"KurdishTTS returned suspiciously small audio: {len(audio_data)} bytes")
-
-            return audio_data
-
-        except requests.Timeout:
-            last_error = f"KurdishTTS timeout after {KURDISH_TTS_TIMEOUT}s (attempt {attempt})"
+        except URLError as e:
+            reason = str(e.reason) if hasattr(e, "reason") else str(e)
+            if "timed out" in reason.lower() or "timeout" in reason.lower():
+                last_error = f"KurdishTTS timeout after {KURDISH_TTS_TIMEOUT}s (attempt {attempt})"
+            else:
+                last_error = f"KurdishTTS connection failed: {reason[:100]} (attempt {attempt})"
             if attempt < KURDISH_TTS_MAX_RETRIES:
                 time.sleep(1 * attempt)
                 continue
 
-        except requests.RequestException as e:
-            last_error = f"KurdishTTS request failed: {str(e)[:100]} (attempt {attempt})"
+        except TTSError:
+            raise
+
+        except Exception as e:
+            last_error = f"KurdishTTS unexpected error: {str(e)[:100]} (attempt {attempt})"
             if attempt < KURDISH_TTS_MAX_RETRIES:
                 time.sleep(1 * attempt)
                 continue
@@ -232,36 +264,83 @@ def synthesize_chunk(text: str, api_key: str, speaker_id: str = KURDISH_TTS_SPEA
     raise TTSError(last_error or "KurdishTTS synthesis failed after retries")
 
 
-# ─── Full Synthesis (with chunking) ─────────────────────────────────────────
+# ─── WAV Validation and Assembly ─────────────────────────────────────────────
 
-def synthesize_kurdish(text: str, speaker_id: str = KURDISH_TTS_SPEAKER) -> bytes:
+def _validate_wav(data: bytes):
+    """Validate that data is a proper WAV file with expected audio params."""
+    try:
+        with wave.open(io.BytesIO(data), "rb") as wf:
+            if wf.getnchannels() != EXPECTED_CHANNELS:
+                raise TTSError(f"KurdishTTS WAV has {wf.getnchannels()} channels, expected {EXPECTED_CHANNELS}")
+            if wf.getsampwidth() != EXPECTED_SAMPLE_WIDTH:
+                raise TTSError(f"KurdishTTS WAV has {wf.getsampwidth()}-byte samples, expected {EXPECTED_SAMPLE_WIDTH}")
+            if wf.getframerate() != EXPECTED_SAMPLE_RATE:
+                raise TTSError(f"KurdishTTS WAV has {wf.getframerate()} Hz, expected {EXPECTED_SAMPLE_RATE}")
+            if wf.getnframes() == 0:
+                raise TTSError("KurdishTTS WAV contains zero audio frames")
+    except wave.Error as e:
+        raise TTSError(f"KurdishTTS returned invalid WAV data: {e}")
+
+
+def _extract_pcm(wav_data: bytes) -> bytes:
+    """Extract raw PCM frames from a WAV file."""
+    with wave.open(io.BytesIO(wav_data), "rb") as wf:
+        return wf.readframes(wf.getnframes())
+
+
+def assemble_wav(chunks: list) -> bytes:
     """
-    Synthesize full Kurdish text to MP3, handling chunking for long texts.
+    Assemble multiple WAV byte buffers into a single valid WAV file.
 
-    MP3 is a frame-based format — concatenating valid MP3 files at the same
-    sample rate produces a valid MP3 stream. The KurdishTTS API returns MP3
-    at 22.05 kHz consistently, making concatenation safe.
+    Extracts PCM frames from each chunk, concatenates them, and writes
+    a new WAV with a correct header using Python's standard wave module.
+    """
+    if len(chunks) == 1:
+        return chunks[0]
 
-    Returns combined MP3 bytes.
+    all_pcm = b""
+    for chunk_data in chunks:
+        all_pcm += _extract_pcm(chunk_data)
+
+    output = io.BytesIO()
+    with wave.open(output, "wb") as wf:
+        wf.setnchannels(EXPECTED_CHANNELS)
+        wf.setsampwidth(EXPECTED_SAMPLE_WIDTH)
+        wf.setframerate(EXPECTED_SAMPLE_RATE)
+        wf.writeframes(all_pcm)
+
+    return output.getvalue()
+
+
+# ─── Full Synthesis (with chunking + WAV assembly) ───────────────────────────
+
+def synthesize_kurdish(text: str, speaker_id: str = None) -> bytes:
+    """
+    Synthesize full Kurdish text to WAV, handling chunking for long texts.
+
+    Returns a single valid WAV file (PCM 16-bit, mono, 22050 Hz).
     Raises TTSError if the API key is missing or synthesis fails.
     """
+    if speaker_id is None:
+        speaker_id = KURDISH_TTS_SPEAKER
+
     api_key = get_api_key()
 
     chunks = chunk_text(text)
-    print(f"  KurdishTTS: synthesizing {len(text)} chars in {len(chunks)} chunk(s)")
+    print(f"  KurdishTTS: synthesizing {len(text)} chars in {len(chunks)} chunk(s), speaker={speaker_id}")
 
-    audio_parts = []
+    wav_parts = []
     total_chars = 0
 
     for i, chunk in enumerate(chunks):
         print(f"  KurdishTTS chunk {i + 1}/{len(chunks)}: {len(chunk)} chars")
-        audio_data = synthesize_chunk(chunk, api_key, speaker_id)
-        audio_parts.append(audio_data)
+        wav_data = synthesize_chunk(chunk, api_key, speaker_id)
+        wav_parts.append(wav_data)
         total_chars += len(chunk)
 
-    # Concatenate MP3 frames
-    combined = b"".join(audio_parts)
-    print(f"  KurdishTTS: total audio {len(combined)} bytes from {total_chars} chars")
+    # Assemble into single WAV
+    combined = assemble_wav(wav_parts)
+    print(f"  KurdishTTS: assembled WAV {len(combined)} bytes from {total_chars} chars, {len(wav_parts)} part(s)")
 
     return combined
 
@@ -276,8 +355,8 @@ class KurdishTTSProvider(TTSProvider):
     Structured for future Sorani extension (separate script generation needed).
     """
 
-    def __init__(self, speaker_id: str = KURDISH_TTS_SPEAKER):
-        self._speaker_id = speaker_id
+    def __init__(self, speaker_id: str = None):
+        self._speaker_id = speaker_id or KURDISH_TTS_SPEAKER
 
     def synthesize(self, text: str, language: str = "ku", voice_id: Optional[str] = None) -> TTSResult:
         """Synthesize Kurdish text to speech."""
@@ -289,11 +368,11 @@ class KurdishTTSProvider(TTSProvider):
 
         return TTSResult(
             audio_data=audio_data,
-            duration_seconds=0.0,  # Not provided by the API
+            duration_seconds=0.0,  # Could be computed from WAV frame count
             provider="kurdish-tts",
             voice_id=speaker,
             language="ku",
-            format="mp3",
+            format="wav",
             chars_synthesized=len(text),
         )
 
