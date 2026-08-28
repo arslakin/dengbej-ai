@@ -611,3 +611,61 @@ def test_get_api_key_json_format(mock_boto):
     assert key == "kt_test_12345"
     # Reset for other tests
     kurdish_tts._cached_api_key = None
+
+
+# ─── Test: KURDISH_TTS_SPEED configuration ───────────────────────────────────
+
+def test_speed_default_value():
+    """Default speed should be 1.1."""
+    from kurdish_tts import KURDISH_TTS_SPEED
+    assert KURDISH_TTS_SPEED == 1.1
+
+
+def test_speed_parse_valid():
+    """Valid speeds within range should be accepted."""
+    from kurdish_tts import _parse_speed
+    assert _parse_speed("1.5") == 1.5
+    assert _parse_speed("0.25") == 0.25
+    assert _parse_speed("4.0") == 4.0
+    assert _parse_speed("2") == 2.0
+
+
+def test_speed_parse_invalid_falls_back():
+    """Invalid speed values should fall back to 1.1."""
+    from kurdish_tts import _parse_speed, _SPEED_DEFAULT
+    assert _parse_speed("0.1") == _SPEED_DEFAULT  # below min
+    assert _parse_speed("5.0") == _SPEED_DEFAULT  # above max
+    assert _parse_speed("abc") == _SPEED_DEFAULT  # non-numeric
+    assert _parse_speed("") == _SPEED_DEFAULT     # empty
+    assert _parse_speed(None) == _SPEED_DEFAULT   # None
+
+
+def test_speed_parse_boundary():
+    """Boundary values should be accepted."""
+    from kurdish_tts import _parse_speed
+    assert _parse_speed("0.25") == 0.25
+    assert _parse_speed("4.0") == 4.0
+
+
+@patch("kurdish_tts.get_api_key")
+@patch("kurdish_tts.urlopen")
+def test_speed_included_in_payload(mock_urlopen, mock_key):
+    """Speed should be included in every API request payload."""
+    import json as json_mod
+    mock_key.return_value = "test-key"
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.headers = {"Content-Type": "audio/wav"}
+    mock_resp.read.return_value = FAKE_WAV
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    mock_urlopen.return_value = mock_resp
+
+    synthesize_chunk("Rojbaş.", "test-key")
+
+    # Extract the payload sent to urlopen
+    call_args = mock_urlopen.call_args
+    req = call_args[0][0]  # First positional arg is the Request object
+    body = json_mod.loads(req.data.decode("utf-8"))
+    assert "speed" in body
+    assert body["speed"] == 1.1

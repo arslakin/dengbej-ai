@@ -44,6 +44,25 @@ KURDISH_TTS_MAX_CHARS = int(os.environ.get("KURDISH_TTS_MAX_CHARS", "480"))
 KURDISH_TTS_TIMEOUT = int(os.environ.get("KURDISH_TTS_TIMEOUT", "30"))
 KURDISH_TTS_MAX_RETRIES = int(os.environ.get("KURDISH_TTS_MAX_RETRIES", "2"))
 
+# Speed: 0.25–4.0 per API docs; higher = faster. Default 1.1 for natural news pace.
+_SPEED_MIN = 0.25
+_SPEED_MAX = 4.0
+_SPEED_DEFAULT = 1.1
+
+
+def _parse_speed(raw: str) -> float:
+    """Parse and validate speed, falling back to default on invalid input."""
+    try:
+        val = float(raw)
+        if _SPEED_MIN <= val <= _SPEED_MAX:
+            return val
+    except (ValueError, TypeError):
+        pass
+    return _SPEED_DEFAULT
+
+
+KURDISH_TTS_SPEED = _parse_speed(os.environ.get("KURDISH_TTS_SPEED", "1.1"))
+
 # Expected WAV parameters from the API (22050 Hz, mono, 16-bit)
 EXPECTED_SAMPLE_RATE = 22050
 EXPECTED_CHANNELS = 1
@@ -184,6 +203,7 @@ def synthesize_chunk(text: str, api_key: str, speaker_id: str = None) -> bytes:
         "speaker_id": speaker_id,
         "model_version": KURDISH_TTS_MODEL,
         "format": "wav",
+        "speed": KURDISH_TTS_SPEED,
     }).encode("utf-8")
 
     last_error = None
