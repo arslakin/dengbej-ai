@@ -835,3 +835,142 @@ def test_batch_execute_stores_ku_only(mock_briefing, mock_program, mock_s3, mock
     assert result["body"]["results"][0]["status"] == "success"
     # Verify _update_program_ku_audio was called (not the full store that touches audio_url)
     mock_update.assert_called_once()
+
+
+# ─── Test: Dry run makes zero side effects ───────────────────────────────────
+
+@patch("lambda_function.s3_client")
+@patch("lambda_function._update_program_ku_audio")
+@patch("lambda_function._update_briefing_ku_audio")
+@patch("lambda_function._get_program_for_batch")
+@patch("lambda_function._get_briefing_for_batch")
+def test_dry_run_zero_api_calls(mock_briefing, mock_program, mock_upd_brief, mock_upd_prog, mock_s3):
+    """Dry run must make zero KurdishTTS calls, zero S3 uploads, zero DynamoDB updates."""
+    from lambda_function import lambda_handler
+
+    mock_briefing.return_value = {
+        "briefing_date": "2026-09-01", "generated_at": "T",
+        "daily_audio_script_ku": "Script text here.",
+        "daily_audio_meta": {},
+    }
+    mock_program.side_effect = lambda pid, d: {
+        "program_id": pid, "briefing_date": d,
+        "script_ku": "Program script.", "story_count": 3,
+    } if pid == "world" else None
+
+    # Patch kurdish_tts to detect if it's ever called
+    with patch.dict("sys.modules", {"kurdish_tts": MagicMock()}) as _:
+        import sys
+        ku_mock = sys.modules["kurdish_tts"]
+        ku_mock.synthesize_kurdish = MagicMock()
+
+        result = lambda_handler({
+            "generate_kurdish_batch": True,
+            "max_chars": 50000,
+            "dry_run": True,
+            "date": "2026-09-01",
+        }, None)
+
+    assert result["statusCode"] == 200
+    assert result["body"]["status"] == "dry_run"
+    # Zero API calls
+    ku_mock.synthesize_kurdish.assert_not_called()
+    # Zero S3 uploads
+    mock_s3.put_object.assert_not_called()
+    # Zero DynamoDB updates
+    mock_upd_brief.assert_not_called()
+    mock_upd_prog.assert_not_called()
+
+
+# ─── Test: Quota module ──────────────────────────────────────────────────────
+
+@patch("quota._dynamodb", None)
+@patch("quota.boto3.resource")
+def test_quota_reserve_success(mock_resource):
+    """Reserve should succeed when under budget."""
+    import quota
+    quota._dynamodb = None
+
+    mock_table = MagicMock()
+    mock_resource.return_value.Table.return_value = mock_table
+    mock_table.update_item.return_value = {}
+
+    result = quota.reserve(500, "2026-08")
+    assert result is True
+    mock_table.update_item.assert_called_once()
+
+
+@patch("quota._dynamodb", None)
+@patch("quota.boto3.resource")
+def test_quota_reserve_exceeds_budget(mock_resource):
+    """Reserve should return False when it would exceed budget."""
+    from botocore.exceptions import ClientError
+    import quota
+    quota._dynamodb = None
+
+    mock_table = MagicMock()
+    mock_resource.return_value.Table.return_value = mock_table
+    mock_table.update_item.side_effect = ClientError(
+        {"Error": {"Code": "ConditionalCheckFailedException", "Message": ""}},
+        "UpdateItem"
+    )
+
+    result = quota.reserve(500, "2026-08")
+    assert result is False
+
+
+@patch("quota._dynamodb", None)
+@patch("quota.boto3.resource")
+def test_quota_refund(mock_resource):
+    """Refund should decrement chars_used."""
+    import quota
+    quota._dynamodb = None
+
+    mock_table = MagicMock()
+    mock_resource.return_value.Table.return_value = mock_table
+    mock_table.update_item.return_value = {}
+
+    quota.refund(300, "2026-08")
+    mock_table.update_item.assert_called_once()
+    # Verify the decrement expression
+    call_kwargs = mock_table.update_item.call_args[1]
+    assert "chars_used - :dec" in call_kwargs["UpdateExpression"]
+
+
+@patch("quota._dynamodb", None)
+@patch("quota.boto3.resource")
+def test_quota_get_usage(mock_resource):
+    """get_usage should return stored chars_used value."""
+    import quota
+    from decimal import Decimal
+    quota._dynamodb = None
+
+    mock_table = MagicMock()
+    mock_resource.return_value.Table.return_value = mock_table
+    mock_table.get_item.return_value = {
+        "Item": {"chars_used": Decimal("6500")}
+    }
+
+    result = quota.get_usage("2026-08")
+    assert result == 6500
+
+
+@patch("quota._dynamodb", None)
+@patch("quota.boto3.resource")
+def test_quota_get_usage_no_record(mock_resource):
+    """get_usage should return 0 for a new month."""
+    import quota
+    quota._dynamodb = None
+
+    mock_table = MagicMock()
+    mock_resource.return_value.Table.return_value = mock_table
+    mock_table.get_item.return_value = {}
+
+    result = quota.get_usage("2026-09")
+    assert result == 0
+
+
+def test_quota_reserve_zero_chars():
+    """Reserving zero chars should succeed trivially."""
+    import quota
+    assert quota.reserve(0) is True

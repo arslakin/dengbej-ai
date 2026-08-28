@@ -164,6 +164,15 @@ def handle_kurdish_batch(event):
     if not isinstance(max_chars, int) or max_chars <= 0:
         return {"statusCode": 400, "body": {"error": "max_chars is required (positive int)"}}
 
+    # Use persistent DynamoDB quota if available, fall back to event parameter
+    from quota import get_usage, get_remaining, reserve as quota_reserve, refund as quota_refund, get_current_month_key
+    month_key = get_current_month_key()
+    try:
+        persistent_used = get_usage(month_key)
+        chars_already_used = max(chars_already_used, persistent_used)
+    except Exception:
+        pass  # Fall back to event-passed value
+
     budget_remaining = min(max_chars, KURDISH_TTS_MONTHLY_BUDGET_CHARS - chars_already_used)
     if budget_remaining <= 0:
         return {"statusCode": 200, "body": {"status": "budget_exhausted", "budget_remaining": 0, "candidates": []}}
@@ -233,11 +242,23 @@ def handle_kurdish_batch(event):
     if dry_run:
         return {"statusCode": 200, "body": report}
 
-    # Execute synthesis
+    # Execute synthesis with atomic quota reservation
     from kurdish_tts import synthesize_kurdish
     results = []
 
     for c in selected:
+        # Reserve quota atomically before calling the API
+        reserved = False
+        try:
+            reserved = quota_reserve(c["chars"], month_key)
+        except Exception:
+            reserved = True  # If quota check fails, proceed cautiously
+
+        if not reserved:
+            results.append({"program_id": c["program_id"], "chars": c["chars"], "status": "skipped", "reason": "quota_exceeded"})
+            print(f"  Batch: {c['program_id']} skipped (quota would be exceeded)")
+            continue
+
         try:
             audio_data = synthesize_kurdish(c["script"], speaker_id=speaker)
             timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -260,6 +281,11 @@ def handle_kurdish_batch(event):
             print(f"  Batch: {c['program_id']} synthesized ({c['chars']} chars)")
 
         except Exception as e:
+            # Refund the reservation on failure
+            try:
+                quota_refund(c["chars"], month_key)
+            except Exception:
+                pass
             results.append({"program_id": c["program_id"], "chars": c["chars"], "status": "failed", "error": str(e)[:100]})
             print(f"  Batch: {c['program_id']} FAILED: {e}")
 
