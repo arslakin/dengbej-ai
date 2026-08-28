@@ -114,17 +114,34 @@ def handle_today_script(target_date, force, telemetry):
     telemetry.script_chars = len(script)
 
     # Generate English audio narration via Polly
-    audio_url = None
+    audio_url_en = None
     if TTS_ENABLED:
         try:
             narration_en = generate_english_narration(processed_stories, target_date, telemetry)
             if narration_en:
-                audio_url = synthesize_and_upload(narration_en, f"daily/{target_date}")
-                print(f"Audio uploaded: {audio_url}")
+                audio_url_en = synthesize_and_upload(narration_en, f"daily/{target_date}_en")
+                print(f"English audio uploaded: {audio_url_en}")
         except Exception as e:
-            print(f"Audio generation failed (non-fatal): {e}")
+            print(f"English audio generation failed (non-fatal): {e}")
 
-    store_script(briefing, script, target_date, telemetry, audio_url=audio_url)
+    # Generate Kurdish audio narration via KurdishTTS
+    audio_url_ku = None
+    if TTS_ENABLED:
+        try:
+            from kurdish_tts import synthesize_kurdish, TTSError as KurdishTTSError
+            audio_data_ku = synthesize_kurdish(script)
+            if audio_data_ku:
+                timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                s3_key = f"daily/{target_date}_ku_{timestamp}.mp3"
+                s3_client.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=audio_data_ku, ContentType="audio/mpeg")
+                audio_url_ku = f"https://{S3_BUCKET}.s3.amazonaws.com/{s3_key}"
+                print(f"Kurdish audio uploaded: {audio_url_ku}")
+        except Exception as e:
+            print(f"Kurdish audio generation failed (non-fatal): {e}")
+
+    # Backward compat: audio_url = Kurdish if available, else English
+    audio_url = audio_url_ku or audio_url_en
+    store_script(briefing, script, target_date, telemetry, audio_url=audio_url, audio_url_en=audio_url_en, audio_url_ku=audio_url_ku)
 
     telemetry.finish()
     print(f"Telemetry: {json.dumps(telemetry.to_dict())}")
@@ -135,6 +152,8 @@ def handle_today_script(target_date, force, telemetry):
         "script_length": len(script),
         "story_count": len(processed_stories),
         "audio_url": audio_url,
+        "audio_url_en": audio_url_en,
+        "audio_url_ku": audio_url_ku,
         "telemetry": telemetry.to_dict(),
     }}
 
@@ -189,18 +208,34 @@ def handle_program_script(program_id, target_date, force, telemetry):
     telemetry.script_chars = len(script)
 
     # Generate English audio narration via Polly
-    audio_url = None
+    audio_url_en = None
     if TTS_ENABLED:
         try:
             narration_en = generate_program_narration_en(stories, program_id, target_date, telemetry)
             if narration_en:
-                audio_url = synthesize_and_upload(narration_en, f"programs/{program_id}/{target_date}")
-                print(f"Program audio uploaded: {audio_url}")
+                audio_url_en = synthesize_and_upload(narration_en, f"programs/{program_id}/{target_date}_en")
+                print(f"Program English audio uploaded: {audio_url_en}")
         except Exception as e:
-            print(f"Program audio generation failed (non-fatal): {e}")
+            print(f"Program English audio generation failed (non-fatal): {e}")
 
-    # Store script back in programs table
-    store_program_script(program_id, target_date, program.get("briefing_date", target_date), script, telemetry, audio_url=audio_url)
+    # Generate Kurdish audio narration via KurdishTTS
+    audio_url_ku = None
+    if TTS_ENABLED:
+        try:
+            from kurdish_tts import synthesize_kurdish, TTSError as KurdishTTSError
+            audio_data_ku = synthesize_kurdish(script)
+            if audio_data_ku:
+                timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                s3_key = f"programs/{program_id}/{target_date}_ku_{timestamp}.mp3"
+                s3_client.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=audio_data_ku, ContentType="audio/mpeg")
+                audio_url_ku = f"https://{S3_BUCKET}.s3.amazonaws.com/{s3_key}"
+                print(f"Program Kurdish audio uploaded: {audio_url_ku}")
+        except Exception as e:
+            print(f"Program Kurdish audio generation failed (non-fatal): {e}")
+
+    # Backward compat: audio_url = Kurdish if available, else English
+    audio_url = audio_url_ku or audio_url_en
+    store_program_script(program_id, target_date, program.get("briefing_date", target_date), script, telemetry, audio_url=audio_url, audio_url_en=audio_url_en, audio_url_ku=audio_url_ku)
 
     telemetry.finish()
     print(f"Telemetry: {json.dumps(telemetry.to_dict())}")
@@ -212,6 +247,8 @@ def handle_program_script(program_id, target_date, force, telemetry):
         "script_length": len(script),
         "story_count": len(stories),
         "audio_url": audio_url,
+        "audio_url_en": audio_url_en,
+        "audio_url_ku": audio_url_ku,
         "telemetry": telemetry.to_dict(),
     }}
 
@@ -318,7 +355,7 @@ KURDISH BROADCAST SCRIPT:"""
         return None
 
 
-def store_program_script(program_id, date_str, briefing_date, script, telemetry, audio_url=None):
+def store_program_script(program_id, date_str, briefing_date, script, telemetry, audio_url=None, audio_url_en=None, audio_url_ku=None):
     """Store generated script in the programs table."""
     try:
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -337,13 +374,19 @@ def store_program_script(program_id, date_str, briefing_date, script, telemetry,
         if audio_url:
             update_expr += ", audio_url = :audio_url"
             expr_values[":audio_url"] = audio_url
+        if audio_url_en:
+            update_expr += ", audio_url_en = :audio_url_en"
+            expr_values[":audio_url_en"] = audio_url_en
+        if audio_url_ku:
+            update_expr += ", audio_url_ku = :audio_url_ku"
+            expr_values[":audio_url_ku"] = audio_url_ku
 
         programs_table.update_item(
             Key={"program_id": program_id, "briefing_date": briefing_date},
             UpdateExpression=update_expr,
             ExpressionAttributeValues=expr_values,
         )
-        print(f"Program script stored: {program_id} ({len(script)} chars, audio={'yes' if audio_url else 'no'})")
+        print(f"Program script stored: {program_id} ({len(script)} chars, audio_en={'yes' if audio_url_en else 'no'}, audio_ku={'yes' if audio_url_ku else 'no'})")
     except ClientError as e:
         print(f"Failed to store program script: {e}")
         raise
@@ -434,31 +477,35 @@ KURDISH BROADCAST SCRIPT:"""
         return None
 
 
-def store_script(briefing, script, date_str, telemetry, audio_url=None):
+def store_script(briefing, script, date_str, telemetry, audio_url=None, audio_url_en=None, audio_url_ku=None):
     """Store the broadcast script and metadata in the briefing record."""
     try:
         generated_at = briefing.get("generated_at", "")
         now_iso = datetime.now(timezone.utc).isoformat()
+
+        meta = {
+            "script_generated_at": now_iso,
+            "model_id": MODEL_ID,
+            "script_chars": len(script),
+            "tts_status": "completed" if audio_url else "pending",
+            "tts_provider": "kurdish-tts" if audio_url_ku else ("polly-en" if audio_url_en else None),
+            "audio_url": audio_url,
+            "audio_url_en": audio_url_en,
+            "audio_url_ku": audio_url_ku,
+            "audio_duration_seconds": None,
+            "bedrock_input_tokens": telemetry.bedrock_input_tokens,
+            "bedrock_output_tokens": telemetry.bedrock_output_tokens,
+        }
 
         briefings_table.update_item(
             Key={"briefing_date": date_str, "generated_at": generated_at},
             UpdateExpression="SET daily_audio_script_ku = :script, daily_audio_meta = :meta",
             ExpressionAttributeValues={
                 ":script": script,
-                ":meta": {
-                    "script_generated_at": now_iso,
-                    "model_id": MODEL_ID,
-                    "script_chars": len(script),
-                    "tts_status": "completed" if audio_url else "pending",
-                    "tts_provider": "polly-en" if audio_url else None,
-                    "audio_url": audio_url,
-                    "audio_duration_seconds": None,
-                    "bedrock_input_tokens": telemetry.bedrock_input_tokens,
-                    "bedrock_output_tokens": telemetry.bedrock_output_tokens,
-                },
+                ":meta": meta,
             },
         )
-        print(f"Script stored for {date_str} ({len(script)} chars, audio={'yes' if audio_url else 'no'})")
+        print(f"Script stored for {date_str} ({len(script)} chars, audio_en={'yes' if audio_url_en else 'no'}, audio_ku={'yes' if audio_url_ku else 'no'})")
     except ClientError as e:
         print(f"Failed to store script: {e}")
         raise

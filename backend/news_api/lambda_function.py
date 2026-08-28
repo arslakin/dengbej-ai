@@ -132,6 +132,8 @@ def format_program(item):
     # Script and audio metadata
     script_ku = item.get("script_ku")
     audio_url = item.get("audio_url")
+    audio_url_ku = item.get("audio_url_ku")
+    audio_url_en = item.get("audio_url_en")
 
     return {
         "program_id": item.get("program_id"),
@@ -144,6 +146,8 @@ def format_program(item):
         "audio": {
             "available": bool(audio_url),
             "url": audio_url,
+            "url_ku": audio_url_ku,
+            "url_en": audio_url_en,
         },
     }
 
@@ -212,12 +216,16 @@ def format_briefing(briefing):
     daily_audio_meta = briefing.get("daily_audio_meta", {})
     script_exists = bool(briefing.get("daily_audio_script_ku"))
     audio_url = daily_audio_meta.get("audio_url") if daily_audio_meta else None
+    audio_url_ku = daily_audio_meta.get("audio_url_ku") if daily_audio_meta else None
+    audio_url_en = daily_audio_meta.get("audio_url_en") if daily_audio_meta else None
 
     daily_audio = {
         "available": bool(audio_url),
         "script_available": script_exists,
         "language": "ku",
         "url": audio_url,
+        "url_ku": audio_url_ku,
+        "url_en": audio_url_en,
         "duration_seconds": daily_audio_meta.get("audio_duration_seconds") if daily_audio_meta else None,
         "generated_at": daily_audio_meta.get("script_generated_at") if daily_audio_meta else None,
     }
