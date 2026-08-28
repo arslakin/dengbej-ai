@@ -669,3 +669,169 @@ def test_speed_included_in_payload(mock_urlopen, mock_key):
     body = json_mod.loads(req.data.decode("utf-8"))
     assert "speed" in body
     assert body["speed"] == 1.1
+
+
+# ─── Test: Batch handler ─────────────────────────────────────────────────────
+
+def test_batch_requires_max_chars():
+    """Batch handler rejects missing max_chars."""
+    from lambda_function import lambda_handler
+    result = lambda_handler({"generate_kurdish_batch": True}, None)
+    assert result["statusCode"] == 400
+    assert "max_chars" in result["body"]["error"]
+
+
+def test_batch_budget_exhausted():
+    """Batch returns budget_exhausted when chars_already_used >= monthly budget."""
+    from lambda_function import lambda_handler
+    result = lambda_handler({
+        "generate_kurdish_batch": True,
+        "max_chars": 5000,
+        "chars_already_used": 18000,
+    }, None)
+    assert result["statusCode"] == 200
+    assert result["body"]["status"] == "budget_exhausted"
+
+
+@patch("lambda_function._get_program_for_batch")
+@patch("lambda_function._get_briefing_for_batch")
+def test_batch_dry_run_reports_candidates(mock_briefing, mock_program):
+    """Dry run should report candidates without making TTS calls."""
+    from lambda_function import lambda_handler
+
+    mock_briefing.return_value = {
+        "briefing_date": "2026-09-01", "generated_at": "2026-09-01T06:00:00Z",
+        "daily_audio_script_ku": "A" * 500,
+        "daily_audio_meta": {"audio_url_ku": None},
+    }
+    mock_program.side_effect = lambda pid, d: {
+        "program_id": pid, "briefing_date": d,
+        "script_ku": "B" * 300, "story_count": 3,
+        "audio_url_ku": None,
+    } if pid == "world" else None
+
+    result = lambda_handler({
+        "generate_kurdish_batch": True,
+        "max_chars": 10000,
+        "dry_run": True,
+        "date": "2026-09-01",
+    }, None)
+
+    assert result["statusCode"] == 200
+    body = result["body"]
+    assert body["status"] == "dry_run"
+    assert body["candidates_found"] == 2
+    assert body["total_chars_selected"] == 800  # 500 + 300
+
+
+@patch("lambda_function._get_program_for_batch")
+@patch("lambda_function._get_briefing_for_batch")
+def test_batch_dry_run_respects_budget(mock_briefing, mock_program):
+    """Dry run should stop selecting when budget would be exceeded."""
+    from lambda_function import lambda_handler
+
+    mock_briefing.return_value = {
+        "briefing_date": "2026-09-01", "generated_at": "T",
+        "daily_audio_script_ku": "A" * 3000,
+        "daily_audio_meta": {},
+    }
+    mock_program.side_effect = lambda pid, d: {
+        "program_id": pid, "briefing_date": d,
+        "script_ku": "B" * 2000, "story_count": 5,
+    } if pid in ("world", "middle-east") else None
+
+    result = lambda_handler({
+        "generate_kurdish_batch": True,
+        "max_chars": 4500,
+        "dry_run": True,
+        "date": "2026-09-01",
+    }, None)
+
+    body = result["body"]
+    # Budget is 4500: today (3000) fits, world (2000) and middle-east (2000) both exceed remaining 1500
+    assert body["candidates_selected"] == 1
+    assert body["total_chars_selected"] == 3000
+    assert len(body["skipped"]) == 2
+    assert body["skipped"][0]["program_id"] == "world"
+    assert body["skipped"][0]["reason"] == "over_budget"
+
+
+@patch("lambda_function._get_program_for_batch")
+@patch("lambda_function._get_briefing_for_batch")
+def test_batch_skips_existing_audio_ku(mock_briefing, mock_program):
+    """Programs with existing audio_url_ku should be skipped (idempotent)."""
+    from lambda_function import lambda_handler
+
+    mock_briefing.return_value = {
+        "briefing_date": "2026-09-01", "generated_at": "T",
+        "daily_audio_script_ku": "Script",
+        "daily_audio_meta": {"audio_url_ku": "https://existing.wav"},
+    }
+    mock_program.return_value = None
+
+    result = lambda_handler({
+        "generate_kurdish_batch": True,
+        "max_chars": 10000,
+        "dry_run": True,
+        "date": "2026-09-01",
+    }, None)
+
+    # Briefing already has audio_url_ku -> should be skipped
+    assert result["body"]["candidates_found"] == 0
+
+
+@patch("lambda_function._get_program_for_batch")
+@patch("lambda_function._get_briefing_for_batch")
+def test_batch_priority_order(mock_briefing, mock_program):
+    """Candidates should follow priority: today > world > middle-east > turkey."""
+    from lambda_function import lambda_handler
+
+    mock_briefing.return_value = None  # No briefing
+
+    def prog_side_effect(pid, d):
+        if pid in ("world", "turkey", "middle-east"):
+            return {"program_id": pid, "briefing_date": d, "script_ku": pid * 10, "story_count": 3}
+        return None
+
+    mock_program.side_effect = prog_side_effect
+
+    result = lambda_handler({
+        "generate_kurdish_batch": True,
+        "max_chars": 50000,
+        "dry_run": True,
+        "date": "2026-09-01",
+    }, None)
+
+    programs = [p["program_id"] for p in result["body"]["programs"]]
+    assert programs == ["world", "middle-east", "turkey"]
+
+
+@patch("lambda_function._update_program_ku_audio")
+@patch("lambda_function.s3_client")
+@patch("lambda_function._get_program_for_batch")
+@patch("lambda_function._get_briefing_for_batch")
+def test_batch_execute_stores_ku_only(mock_briefing, mock_program, mock_s3, mock_update):
+    """Non-dry-run batch should store audio_url_ku without touching English."""
+    from lambda_function import lambda_handler
+
+    mock_briefing.return_value = None
+    mock_program.side_effect = lambda pid, d: {
+        "program_id": pid, "briefing_date": d,
+        "script_ku": "Rojbaş.", "story_count": 2,
+    } if pid == "world" else None
+
+    with patch.dict("sys.modules", {"kurdish_tts": MagicMock()}) as _:
+        import sys
+        sys.modules["kurdish_tts"].synthesize_kurdish.return_value = FAKE_WAV
+
+        result = lambda_handler({
+            "generate_kurdish_batch": True,
+            "max_chars": 10000,
+            "dry_run": False,
+            "date": "2026-09-01",
+        }, None)
+
+    assert result["body"]["status"] == "completed"
+    assert result["body"]["results"][0]["status"] == "success"
+    # Verify _update_program_ku_audio was called (not the full store that touches audio_url)
+    mock_update.assert_called_once()

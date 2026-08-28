@@ -34,6 +34,7 @@ MODEL_ID = os.environ.get("MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1
 S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "dengbej-audio")
 TTS_ENABLED = os.environ.get("TTS_ENABLED", "true").lower() == "true"
 KURDISH_TTS_ENABLED = os.environ.get("KURDISH_TTS_ENABLED", "false").lower() == "true"
+KURDISH_TTS_MONTHLY_BUDGET_CHARS = int(os.environ.get("KURDISH_TTS_MONTHLY_BUDGET_CHARS", "18000"))
 
 # AWS Clients
 dynamodb = boto3.resource("dynamodb")
@@ -72,6 +73,10 @@ def lambda_handler(event, context):
     # Controlled test event: synthesize a short Kurdish sample without touching briefings
     if event.get("test_kurdish_tts") is True:
         return handle_tts_test(event)
+
+    # Controlled batch: generate Kurdish audio for multiple programs within budget
+    if event.get("generate_kurdish_batch") is True:
+        return handle_kurdish_batch(event)
 
     telemetry = Telemetry()
 
@@ -131,6 +136,181 @@ def handle_tts_test(event):
 
 
 KURDISH_TTS_SPEAKER = os.environ.get("KURDISH_TTS_SPEAKER", "kurmanji_236")
+
+# Priority order for batch generation
+BATCH_PRIORITY = ["today", "world", "middle-east", "turkey", "kurdistan", "bakur", "rojava", "basur", "rojhilat"]
+
+
+def handle_kurdish_batch(event):
+    """
+    Generate Kurdish audio for multiple programs within a character budget.
+
+    Required event fields:
+      generate_kurdish_batch: true
+      max_chars: int (hard cap for this invocation)
+
+    Optional:
+      dry_run: bool (default true — report candidates without making API calls)
+      chars_already_used: int (characters already consumed this month, default 0)
+
+    Prioritizes: today > world > middle-east > turkey > regional programs.
+    Skips programs that already have audio_url_ku or have zero stories.
+    Stops before exceeding budget. Does not modify English audio fields.
+    """
+    dry_run = event.get("dry_run", True)
+    max_chars = event.get("max_chars")
+    chars_already_used = int(event.get("chars_already_used", 0))
+
+    if not isinstance(max_chars, int) or max_chars <= 0:
+        return {"statusCode": 400, "body": {"error": "max_chars is required (positive int)"}}
+
+    budget_remaining = min(max_chars, KURDISH_TTS_MONTHLY_BUDGET_CHARS - chars_already_used)
+    if budget_remaining <= 0:
+        return {"statusCode": 200, "body": {"status": "budget_exhausted", "budget_remaining": 0, "candidates": []}}
+
+    target_date = event.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    speaker = event.get("speaker_id", KURDISH_TTS_SPEAKER)
+
+    # Gather candidates with their scripts
+    candidates = []
+
+    # Today's briefing
+    briefing = _get_briefing_for_batch(target_date)
+    if briefing:
+        script = briefing.get("daily_audio_script_ku", "")
+        existing_ku = (briefing.get("daily_audio_meta") or {}).get("audio_url_ku")
+        if script and not existing_ku:
+            candidates.append({
+                "program_id": "today",
+                "script": script,
+                "chars": len(script),
+                "source": "briefing",
+                "briefing_date": briefing["briefing_date"],
+                "generated_at": briefing.get("generated_at", ""),
+            })
+
+    # Topic programs in priority order
+    for pid in BATCH_PRIORITY:
+        if pid == "today":
+            continue
+        program = _get_program_for_batch(pid, target_date)
+        if not program:
+            continue
+        script = program.get("script_ku", "")
+        existing_ku = program.get("audio_url_ku")
+        story_count = program.get("story_count", 0)
+        if not script or existing_ku or story_count == 0:
+            continue
+        candidates.append({
+            "program_id": pid,
+            "script": script,
+            "chars": len(script),
+            "source": "program",
+            "briefing_date": program.get("briefing_date", target_date),
+        })
+
+    # Calculate what fits within budget
+    selected = []
+    total_chars = 0
+    for c in candidates:
+        if total_chars + c["chars"] > budget_remaining:
+            break
+        selected.append(c)
+        total_chars += c["chars"]
+
+    report = {
+        "status": "dry_run" if dry_run else "completed",
+        "date": target_date,
+        "budget_remaining": budget_remaining,
+        "candidates_found": len(candidates),
+        "candidates_selected": len(selected),
+        "total_chars_selected": total_chars,
+        "chars_already_used": chars_already_used,
+        "programs": [{"program_id": c["program_id"], "chars": c["chars"]} for c in selected],
+        "skipped": [{"program_id": c["program_id"], "chars": c["chars"], "reason": "over_budget"} for c in candidates[len(selected):]],
+    }
+
+    if dry_run:
+        return {"statusCode": 200, "body": report}
+
+    # Execute synthesis
+    from kurdish_tts import synthesize_kurdish
+    results = []
+
+    for c in selected:
+        try:
+            audio_data = synthesize_kurdish(c["script"], speaker_id=speaker)
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+
+            if c["source"] == "briefing":
+                s3_key = f"daily/{c['briefing_date']}_ku_{timestamp}.wav"
+            else:
+                s3_key = f"programs/{c['program_id']}/{c['briefing_date']}_ku_{timestamp}.wav"
+
+            s3_client.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=audio_data, ContentType="audio/wav")
+            audio_url_ku = f"https://{S3_BUCKET}.s3.amazonaws.com/{s3_key}"
+
+            # Update DynamoDB (only audio_url_ku, never touch audio_url or audio_url_en)
+            if c["source"] == "briefing":
+                _update_briefing_ku_audio(c["briefing_date"], c["generated_at"], audio_url_ku)
+            else:
+                _update_program_ku_audio(c["program_id"], c["briefing_date"], audio_url_ku)
+
+            results.append({"program_id": c["program_id"], "chars": c["chars"], "status": "success", "audio_url_ku": audio_url_ku})
+            print(f"  Batch: {c['program_id']} synthesized ({c['chars']} chars)")
+
+        except Exception as e:
+            results.append({"program_id": c["program_id"], "chars": c["chars"], "status": "failed", "error": str(e)[:100]})
+            print(f"  Batch: {c['program_id']} FAILED: {e}")
+
+    chars_consumed = sum(r["chars"] for r in results if r["status"] == "success")
+    report["status"] = "completed"
+    report["results"] = results
+    report["chars_consumed"] = chars_consumed
+    report["new_monthly_total"] = chars_already_used + chars_consumed
+
+    return {"statusCode": 200, "body": report}
+
+
+def _get_briefing_for_batch(date_str):
+    """Get today's briefing without filtering by processing status."""
+    try:
+        response = briefings_table.query(
+            KeyConditionExpression="briefing_date = :bd",
+            ExpressionAttributeValues={":bd": date_str},
+            ScanIndexForward=False, Limit=1,
+        )
+        items = response.get("Items", [])
+        return items[0] if items else None
+    except Exception:
+        return None
+
+
+def _get_program_for_batch(program_id, date_str):
+    """Get a program briefing."""
+    try:
+        response = programs_table.get_item(Key={"program_id": program_id, "briefing_date": date_str})
+        return response.get("Item")
+    except Exception:
+        return None
+
+
+def _update_briefing_ku_audio(briefing_date, generated_at, audio_url_ku):
+    """Update only audio_url_ku in the briefing's daily_audio_meta."""
+    briefings_table.update_item(
+        Key={"briefing_date": briefing_date, "generated_at": generated_at},
+        UpdateExpression="SET daily_audio_meta.audio_url_ku = :ku",
+        ExpressionAttributeValues={":ku": audio_url_ku},
+    )
+
+
+def _update_program_ku_audio(program_id, briefing_date, audio_url_ku):
+    """Update only audio_url_ku on the program record."""
+    programs_table.update_item(
+        Key={"program_id": program_id, "briefing_date": briefing_date},
+        UpdateExpression="SET audio_url_ku = :ku",
+        ExpressionAttributeValues={":ku": audio_url_ku},
+    )
 
 
 def handle_today_script(target_date, force, telemetry):
