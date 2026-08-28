@@ -648,11 +648,8 @@
             programAvailability["today"] = stories.length > 0;
             renderStories(data);
             updateBejeButton();
-            // Auto-play if audio available — prefer Kurdish in Kurdish mode
-            var audioUrl = null;
-            if (data.daily_audio && data.daily_audio.available) {
-              audioUrl = (currentLang === "ku" && data.daily_audio.url_ku) ? data.daily_audio.url_ku : (data.daily_audio.url_en || data.daily_audio.url);
-            }
+            // Auto-play if audio available
+            var audioUrl = (data.daily_audio && data.daily_audio.available) ? data.daily_audio.url : null;
             if (audioUrl) playAudio(audioUrl);
             if (onSuccess) onSuccess();
           })
@@ -678,11 +675,8 @@
             renderPrograms();
             renderProgramView(data, programId);
             updateBejeButton();
-            // Auto-play if audio available — prefer Kurdish in Kurdish mode
-            var audioUrl = null;
-            if (data.audio && data.audio.available) {
-              audioUrl = (currentLang === "ku" && data.audio.url_ku) ? data.audio.url_ku : (data.audio.url_en || data.audio.url);
-            }
+            // Auto-play if audio available
+            var audioUrl = (data.audio && data.audio.available) ? data.audio.url : null;
             if (audioUrl) playAudio(audioUrl);
             if (onSuccess) onSuccess();
           })
