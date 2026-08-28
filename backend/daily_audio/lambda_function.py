@@ -33,6 +33,7 @@ PROGRAMS_TABLE = os.environ.get("PROGRAMS_TABLE", "dengbej-programs")
 MODEL_ID = os.environ.get("MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
 S3_BUCKET = os.environ.get("S3_BUCKET_NAME", "dengbej-audio")
 TTS_ENABLED = os.environ.get("TTS_ENABLED", "true").lower() == "true"
+KURDISH_TTS_ENABLED = os.environ.get("KURDISH_TTS_ENABLED", "false").lower() == "true"
 
 # AWS Clients
 dynamodb = boto3.resource("dynamodb")
@@ -67,6 +68,11 @@ class Telemetry:
 
 def lambda_handler(event, context):
     """Generate Kurdish broadcast script from Today's 5 or a specific program."""
+
+    # Controlled test event: synthesize a short Kurdish sample without touching briefings
+    if event.get("test_kurdish_tts") is True:
+        return handle_tts_test(event)
+
     telemetry = Telemetry()
 
     target_date = event.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -77,6 +83,54 @@ def lambda_handler(event, context):
         return handle_program_script(program_id, target_date, force, telemetry)
     else:
         return handle_today_script(target_date, force, telemetry)
+
+
+# ─── Controlled TTS Test (does not touch briefings or programs) ──────────────
+
+def handle_tts_test(event):
+    """
+    Synthesize a short Kurdish text sample for testing.
+
+    Required event fields:
+      test_kurdish_tts: true  (exactly boolean true)
+      text: string, max 300 characters
+
+    Stores result under tts-tests/ S3 prefix. Does not modify DynamoDB.
+    Does not log or expose the API key.
+    """
+    text = event.get("text", "")
+    if not text or not isinstance(text, str):
+        return {"statusCode": 400, "body": {"error": "text is required (string)"}}
+    if len(text) > 300:
+        return {"statusCode": 400, "body": {"error": f"text exceeds 300 char limit ({len(text)} chars)"}}
+
+    speaker = event.get("speaker_id", KURDISH_TTS_SPEAKER)
+
+    try:
+        from kurdish_tts import synthesize_kurdish
+        audio_data = synthesize_kurdish(text, speaker_id=speaker)
+    except Exception as e:
+        return {"statusCode": 500, "body": {"error": f"TTS synthesis failed: {str(e)[:200]}"}}
+
+    # Upload to S3 under tts-tests/ prefix
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    s3_key = f"tts-tests/{speaker}_{timestamp}.wav"
+    s3_client.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=audio_data, ContentType="audio/wav")
+    audio_url = f"https://{S3_BUCKET}.s3.amazonaws.com/{s3_key}"
+
+    print(f"TTS test: {len(text)} chars, speaker={speaker}, size={len(audio_data)} bytes, key={s3_key}")
+
+    return {"statusCode": 200, "body": {
+        "status": "test_complete",
+        "chars_synthesized": len(text),
+        "speaker_id": speaker,
+        "audio_size_bytes": len(audio_data),
+        "audio_url": audio_url,
+        "s3_key": s3_key,
+    }}
+
+
+KURDISH_TTS_SPEAKER = os.environ.get("KURDISH_TTS_SPEAKER", "kurmanji_236")
 
 
 def handle_today_script(target_date, force, telemetry):
@@ -126,9 +180,9 @@ def handle_today_script(target_date, force, telemetry):
 
     # Generate Kurdish audio narration via KurdishTTS
     audio_url_ku = None
-    if TTS_ENABLED:
+    if KURDISH_TTS_ENABLED:
         try:
-            from kurdish_tts import synthesize_kurdish, TTSError as KurdishTTSError
+            from kurdish_tts import synthesize_kurdish
             audio_data_ku = synthesize_kurdish(script)
             if audio_data_ku:
                 timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -139,8 +193,8 @@ def handle_today_script(target_date, force, telemetry):
         except Exception as e:
             print(f"Kurdish audio generation failed (non-fatal): {e}")
 
-    # Backward compat: audio_url = Kurdish if available, else English
-    audio_url = audio_url_ku or audio_url_en
+    # Legacy compat: audio_url always points to English Polly
+    audio_url = audio_url_en
     store_script(briefing, script, target_date, telemetry, audio_url=audio_url, audio_url_en=audio_url_en, audio_url_ku=audio_url_ku)
 
     telemetry.finish()
@@ -220,9 +274,9 @@ def handle_program_script(program_id, target_date, force, telemetry):
 
     # Generate Kurdish audio narration via KurdishTTS
     audio_url_ku = None
-    if TTS_ENABLED:
+    if KURDISH_TTS_ENABLED:
         try:
-            from kurdish_tts import synthesize_kurdish, TTSError as KurdishTTSError
+            from kurdish_tts import synthesize_kurdish
             audio_data_ku = synthesize_kurdish(script)
             if audio_data_ku:
                 timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -233,8 +287,8 @@ def handle_program_script(program_id, target_date, force, telemetry):
         except Exception as e:
             print(f"Program Kurdish audio generation failed (non-fatal): {e}")
 
-    # Backward compat: audio_url = Kurdish if available, else English
-    audio_url = audio_url_ku or audio_url_en
+    # Legacy compat: audio_url always points to English Polly
+    audio_url = audio_url_en
     store_program_script(program_id, target_date, program.get("briefing_date", target_date), script, telemetry, audio_url=audio_url, audio_url_en=audio_url_en, audio_url_ku=audio_url_ku)
 
     telemetry.finish()

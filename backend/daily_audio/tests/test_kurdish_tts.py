@@ -469,3 +469,145 @@ def test_provider_speaker_configurable():
     """Speaker should be configurable via constructor."""
     provider = KurdishTTSProvider(speaker_id="kurmanji_241")
     assert provider._speaker_id == "kurmanji_241"
+
+
+# ─── Test: KURDISH_TTS_ENABLED flag ──────────────────────────────────────────
+
+@patch("lambda_function.KURDISH_TTS_ENABLED", False)
+@patch("lambda_function.TTS_ENABLED", True)
+@patch("lambda_function.synthesize_and_upload")
+@patch("lambda_function.generate_english_narration")
+@patch("lambda_function.get_processed_briefing")
+@patch("lambda_function.invoke_bedrock")
+@patch("lambda_function.store_script")
+def test_kurdish_tts_disabled_skips_synthesis(mock_store, mock_bedrock, mock_get, mock_en, mock_synth):
+    """When KURDISH_TTS_ENABLED=false, Kurdish TTS is never called."""
+    from lambda_function import lambda_handler
+
+    briefing = {
+        "briefing_date": "2026-09-01", "generated_at": "2026-09-01T06:00:00Z",
+        "stories": [{"processing_status": "processed", "headline": "Test", "category": "world",
+                     "summary_en": "Summary", "summary_ku": "Kurte", "primary_source": "BBC"}] * 5,
+    }
+    mock_get.return_value = briefing
+    mock_bedrock.return_value = "Rojbaş. Script ku."
+    mock_en.return_value = "English narration."
+    mock_synth.return_value = "https://dengbej-audio.s3.amazonaws.com/daily/en.mp3"
+
+    result = lambda_handler({"date": "2026-09-01", "force": True}, None)
+
+    assert result["statusCode"] == 200
+    # store_script should have been called — check audio_url_ku is None
+    call_args = mock_store.call_args
+    kwargs = call_args[1] if call_args[1] else {}
+    # audio_url_ku should be None when disabled
+    assert kwargs.get("audio_url_ku") is None
+    # audio_url should be English (legacy compat)
+    assert kwargs.get("audio_url") == "https://dengbej-audio.s3.amazonaws.com/daily/en.mp3"
+
+
+@patch("lambda_function.KURDISH_TTS_ENABLED", False)
+@patch("lambda_function.TTS_ENABLED", True)
+@patch("lambda_function.synthesize_and_upload")
+@patch("lambda_function.generate_english_narration")
+@patch("lambda_function.get_processed_briefing")
+@patch("lambda_function.invoke_bedrock")
+@patch("lambda_function.store_script")
+def test_legacy_audio_url_always_english(mock_store, mock_bedrock, mock_get, mock_en, mock_synth):
+    """Legacy audio_url field must always point to English Polly audio."""
+    from lambda_function import lambda_handler
+
+    briefing = {
+        "briefing_date": "2026-09-01", "generated_at": "2026-09-01T06:00:00Z",
+        "stories": [{"processing_status": "processed", "headline": "Test", "category": "world",
+                     "summary_en": "S", "summary_ku": "K", "primary_source": "BBC"}] * 5,
+    }
+    mock_get.return_value = briefing
+    mock_bedrock.return_value = "Script."
+    mock_en.return_value = "English."
+    en_url = "https://dengbej-audio.s3.amazonaws.com/daily/2026-09-01_en_test.mp3"
+    mock_synth.return_value = en_url
+
+    result = lambda_handler({"date": "2026-09-01", "force": True}, None)
+
+    assert result["statusCode"] == 200
+    # The response audio_url should be English
+    assert result["body"]["audio_url"] == en_url
+    assert result["body"]["audio_url_en"] == en_url
+    assert result["body"]["audio_url_ku"] is None
+
+
+# ─── Test: Controlled TTS test handler ───────────────────────────────────────
+
+def test_tts_test_rejects_missing_text():
+    """Test handler rejects missing text."""
+    from lambda_function import lambda_handler
+    result = lambda_handler({"test_kurdish_tts": True}, None)
+    assert result["statusCode"] == 400
+    assert "required" in result["body"]["error"].lower()
+
+
+def test_tts_test_rejects_too_long_text():
+    """Test handler rejects text over 300 chars."""
+    from lambda_function import lambda_handler
+    result = lambda_handler({"test_kurdish_tts": True, "text": "A" * 301}, None)
+    assert result["statusCode"] == 400
+    assert "300" in result["body"]["error"]
+
+
+def test_tts_test_rejects_non_boolean_flag():
+    """test_kurdish_tts must be exactly boolean True, not string."""
+    from lambda_function import lambda_handler, Telemetry
+    # With "true" string, should NOT trigger the test handler
+    # It should fall through to normal handling
+    with patch("lambda_function.get_processed_briefing") as mock_get:
+        mock_get.return_value = None
+        result = lambda_handler({"test_kurdish_tts": "true", "date": "2099-01-01"}, None)
+        # Normal flow: no briefing found -> 404
+        assert result["statusCode"] == 404
+
+
+@patch("lambda_function.s3_client")
+def test_tts_test_success(mock_s3):
+    """Successful test stores under tts-tests/ prefix."""
+    from lambda_function import lambda_handler
+
+    with patch.dict("sys.modules", {"kurdish_tts": MagicMock()}) as _:
+        import sys
+        sys.modules["kurdish_tts"].synthesize_kurdish.return_value = FAKE_WAV
+
+        result = lambda_handler({
+            "test_kurdish_tts": True,
+            "text": "Rojbaş, ev testek e."
+        }, None)
+
+    assert result["statusCode"] == 200
+    assert result["body"]["status"] == "test_complete"
+    assert result["body"]["chars_synthesized"] == 20
+    assert "tts-tests/" in result["body"]["s3_key"]
+    assert result["body"]["audio_url"].endswith(".wav")
+
+    # Verify S3 call used tts-tests/ prefix and audio/wav
+    call_kwargs = mock_s3.put_object.call_args[1]
+    assert call_kwargs["Key"].startswith("tts-tests/")
+    assert call_kwargs["ContentType"] == "audio/wav"
+
+
+# ─── Test: Secrets Manager JSON format ───────────────────────────────────────
+
+@patch("kurdish_tts._cached_api_key", None)
+@patch("kurdish_tts.boto3.client")
+def test_get_api_key_json_format(mock_boto):
+    """Should parse JSON secret with api_key field."""
+    mock_client = MagicMock()
+    mock_boto.return_value = mock_client
+    mock_client.get_secret_value.return_value = {
+        "SecretString": '{"api_key": "kt_test_12345"}'
+    }
+
+    import kurdish_tts
+    kurdish_tts._cached_api_key = None
+    key = get_api_key()
+    assert key == "kt_test_12345"
+    # Reset for other tests
+    kurdish_tts._cached_api_key = None

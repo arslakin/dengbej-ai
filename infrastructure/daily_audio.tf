@@ -86,6 +86,7 @@ resource "aws_lambda_function" "daily_audio" {
       MODEL_ID                = var.bedrock_model_id
       S3_BUCKET_NAME          = aws_s3_bucket.audio_storage.id
       TTS_ENABLED             = "true"
+      KURDISH_TTS_ENABLED     = "false"
       KURDISH_TTS_SECRET_NAME = "dengbej-ai/kurdish-tts-api-key"
       KURDISH_TTS_SPEAKER     = "kurmanji_236"
     }
