@@ -81,14 +81,16 @@ resource "aws_lambda_function" "daily_audio" {
   memory_size      = 256
   environment {
     variables = {
-      BRIEFINGS_TABLE         = aws_dynamodb_table.briefings.name
-      PROGRAMS_TABLE          = aws_dynamodb_table.programs.name
-      MODEL_ID                = var.bedrock_model_id
-      S3_BUCKET_NAME          = aws_s3_bucket.audio_storage.id
-      TTS_ENABLED             = "true"
-      KURDISH_TTS_ENABLED     = "false"
-      KURDISH_TTS_SECRET_NAME = "dengbej-ai/kurdish-tts-api-key"
-      KURDISH_TTS_SPEAKER     = "kurmanji_236"
+      BRIEFINGS_TABLE                  = aws_dynamodb_table.briefings.name
+      PROGRAMS_TABLE                   = aws_dynamodb_table.programs.name
+      MODEL_ID                         = var.bedrock_model_id
+      S3_BUCKET_NAME                   = aws_s3_bucket.audio_storage.id
+      TTS_ENABLED                      = "true"
+      KURDISH_TTS_ENABLED              = "false"
+      KURDISH_TTS_SECRET_NAME          = "dengbej-ai/kurdish-tts-api-key"
+      KURDISH_TTS_SPEAKER              = "kurmanji_236"
+      KURDISH_TTS_SPEED                = "1.1"
+      KURDISH_TTS_MONTHLY_BUDGET_CHARS = "18000"
     }
   }
   tags = { Name = "Dengbej AI Daily Audio", Project = "dengbej-ai" }
