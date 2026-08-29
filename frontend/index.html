@@ -410,6 +410,7 @@
       var currentLang = sessionStorage.getItem("dengbej-lang") || "en";
       var selectedProgram = "today";
       var currentData = null;
+      var currentBriefingDate = null;  // ISO date (YYYY-MM-DD) from the loaded briefing
       var isLoading = false;
       var programAvailability = {};
 
@@ -477,15 +478,25 @@
         return cat;
       }
 
+      function _dateFromIso(isoDate) {
+        // Parse a YYYY-MM-DD string into a Date at UTC noon to avoid TZ drift.
+        if (isoDate && /^\d{4}-\d{2}-\d{2}/.test(isoDate)) {
+          var parts = isoDate.slice(0, 10).split("-");
+          return new Date(Date.UTC(+parts[0], +parts[1] - 1, +parts[2], 12, 0, 0));
+        }
+        return new Date();
+      }
+
       function formatDate() {
-        return new Date().toLocaleDateString("en-US", {
-          weekday: "long", year: "numeric", month: "long", day: "numeric"
+        var d = _dateFromIso(currentBriefingDate);
+        return d.toLocaleDateString("en-US", {
+          weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC"
         });
       }
 
       function formatDateKu() {
-        var d = new Date();
-        return KU_DAYS[d.getDay()] + ", " + d.getDate() + "\u00EA " + KU_MONTHS[d.getMonth()] + " " + d.getFullYear();
+        var d = _dateFromIso(currentBriefingDate);
+        return KU_DAYS[d.getUTCDay()] + ", " + d.getUTCDate() + "\u00EA " + KU_MONTHS[d.getUTCMonth()] + " " + d.getUTCFullYear();
       }
 
       // ── Language ──
@@ -571,18 +582,31 @@
       function updateBejeButton() {
         if (isLoading) return;
         var label = currentLang === "ku" ? "B\u00EAje!" : "Tell me!";
-        if (currentData && currentData._programId === selectedProgram && currentData.audio && currentData.audio.available && currentData.audio.url) {
+
+        // Determine which audio meta applies to the current selection
+        var audioMeta = null;
+        if (currentData && currentData._programId === selectedProgram) {
+          audioMeta = (selectedProgram === "today") ? currentData.daily_audio : currentData.audio;
+        }
+
+        var url = selectAudioUrl(audioMeta);
+        if (url) {
           bejeBtn.textContent = label + " \u25B6";
           bejeBtn.disabled = false;
-          audioStatusEl.textContent = currentLang === "ku" ? "Deng bi \u00CEngilîz\u00EE amade ye" : "English narration ready";
-        } else if (currentData && currentData._programId === selectedProgram && selectedProgram === "today" && currentData.daily_audio && currentData.daily_audio.available && currentData.daily_audio.url) {
-          bejeBtn.textContent = label + " \u25B6";
-          bejeBtn.disabled = false;
-          audioStatusEl.textContent = currentLang === "ku" ? "Deng bi \u00CEngilîz\u00EE amade ye" : "English narration ready";
+          // Status reflects the actual language that will play
+          var isKurdish = (currentLang === "ku" && audioMeta && audioMeta.url_ku);
+          if (isKurdish) {
+            audioStatusEl.textContent = "Deng bi Kurd\u00EE amade ye";
+          } else if (currentLang === "ku") {
+            // Kurdish mode but only English audio exists
+            audioStatusEl.textContent = "Deng bi \u00CEngilîz\u00EE amade ye";
+          } else {
+            audioStatusEl.textContent = "English narration ready";
+          }
         } else {
           bejeBtn.textContent = label;
           bejeBtn.disabled = false;
-          audioStatusEl.textContent = currentLang === "ku" ? "Deng bi \u00CEngilîz\u00EE \u2014 z\u00FB t\u00EA" : "English narration \u2014 coming soon";
+          audioStatusEl.textContent = currentLang === "ku" ? "Deng \u2014 z\u00FB t\u00EA" : "Audio \u2014 coming soon";
         }
       }
 
@@ -644,15 +668,17 @@
           .then(function(data) {
             data._programId = "today";
             currentData = data;
+            // Date comes from the briefing record, not the browser clock
+            if (data.date) {
+              currentBriefingDate = data.date;
+              dateEl.textContent = currentLang === "ku" ? formatDateKu() : formatDate();
+            }
             var stories = data.stories || data.briefing || [];
             programAvailability["today"] = stories.length > 0;
             renderStories(data);
             updateBejeButton();
             // Auto-play if audio available — prefer Kurdish in Kurdish mode
-            var audioUrl = null;
-            if (data.daily_audio && data.daily_audio.available) {
-              audioUrl = (currentLang === "ku" && data.daily_audio.url_ku) ? data.daily_audio.url_ku : (data.daily_audio.url_en || data.daily_audio.url);
-            }
+            var audioUrl = selectAudioUrl(data.daily_audio);
             if (audioUrl) playAudio(audioUrl);
             if (onSuccess) onSuccess();
           })
@@ -672,6 +698,11 @@
           .then(function(data) {
             data._programId = programId;
             currentData = data;
+            // Program date from the record (falls back to generated_at date)
+            if (data.generated_at) {
+              currentBriefingDate = data.generated_at.slice(0, 10);
+              dateEl.textContent = currentLang === "ku" ? formatDateKu() : formatDate();
+            }
             var stories = data.stories || [];
             var storyCount = data.story_count || stories.length;
             programAvailability[programId] = storyCount > 0;
@@ -679,10 +710,7 @@
             renderProgramView(data, programId);
             updateBejeButton();
             // Auto-play if audio available — prefer Kurdish in Kurdish mode
-            var audioUrl = null;
-            if (data.audio && data.audio.available) {
-              audioUrl = (currentLang === "ku" && data.audio.url_ku) ? data.audio.url_ku : (data.audio.url_en || data.audio.url);
-            }
+            var audioUrl = selectAudioUrl(data.audio);
             if (audioUrl) playAudio(audioUrl);
             if (onSuccess) onSuccess();
           })
@@ -836,6 +864,17 @@
             }
           });
         });
+      }
+
+      // ── Audio Selection ──
+      // Kurdish mode prefers url_ku; English mode prefers url_en then legacy url.
+      // Falls back to English only when the selected briefing has no Kurdish audio.
+      function selectAudioUrl(audioMeta) {
+        if (!audioMeta || !audioMeta.available) return null;
+        if (currentLang === "ku") {
+          return audioMeta.url_ku || audioMeta.url_en || audioMeta.url || null;
+        }
+        return audioMeta.url_en || audioMeta.url || null;
       }
 
       // ── Audio Player ──

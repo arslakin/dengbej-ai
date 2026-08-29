@@ -433,3 +433,64 @@ def test_headline_ku_none_when_missing():
     body = json.loads(response["body"])
     assert body["stories"][0]["headline_ku"] is None
     assert body["stories"][0]["headline"] == "Story 1 headline"
+
+
+# ─── Regression: Kurdish audio URL selection ─────────────────────────────────
+
+def test_daily_audio_returns_url_ku_when_present():
+    """When a briefing has audio_url_ku, the API must return it as url_ku."""
+    stories = [_make_story(1)]
+    briefing = _make_briefing("2026-08-28", stories)
+    briefing["daily_audio_script_ku"] = "Rojbaş."
+    briefing["daily_audio_meta"] = {
+        "audio_url": "https://dengbej-audio.s3.amazonaws.com/daily/2026-08-28_en.mp3",
+        "audio_url_en": "https://dengbej-audio.s3.amazonaws.com/daily/2026-08-28_en.mp3",
+        "audio_url_ku": "https://dengbej-audio.s3.amazonaws.com/daily/2026-08-28_ku.wav",
+    }
+
+    with patch("lambda_function.briefings_table") as mock_table:
+        mock_table.query.return_value = {"Items": [briefing]}
+        response = _invoke_lambda("/news/2026-08-28")
+
+    body = json.loads(response["body"])
+    da = body["daily_audio"]
+    assert da["url_ku"] == "https://dengbej-audio.s3.amazonaws.com/daily/2026-08-28_ku.wav"
+    assert da["url_en"] == "https://dengbej-audio.s3.amazonaws.com/daily/2026-08-28_en.mp3"
+    # Legacy url stays English
+    assert da["url"].endswith("_en.mp3")
+
+
+def test_daily_audio_url_ku_none_when_absent():
+    """A briefing without Kurdish audio must return url_ku=None (English fallback)."""
+    stories = [_make_story(1)]
+    briefing = _make_briefing("2026-08-29", stories)
+    briefing["daily_audio_script_ku"] = "Rojbaş."
+    briefing["daily_audio_meta"] = {
+        "audio_url": "https://dengbej-audio.s3.amazonaws.com/daily/2026-08-29_en.mp3",
+        "audio_url_en": "https://dengbej-audio.s3.amazonaws.com/daily/2026-08-29_en.mp3",
+        "audio_url_ku": None,
+    }
+
+    with patch("lambda_function.briefings_table") as mock_table:
+        mock_table.query.return_value = {"Items": [briefing]}
+        response = _invoke_lambda("/news/2026-08-29")
+
+    body = json.loads(response["body"])
+    da = body["daily_audio"]
+    assert da["url_ku"] is None
+    assert da["url_en"].endswith("_en.mp3")
+    assert da["available"] is True
+
+
+def test_daily_audio_date_matches_briefing_record():
+    """The returned date must match the briefing record, not a synthetic value."""
+    stories = [_make_story(1)]
+    briefing = _make_briefing("2026-08-28", stories)
+    briefing["daily_audio_meta"] = {"audio_url_ku": "https://x/ku.wav"}
+
+    with patch("lambda_function.briefings_table") as mock_table:
+        mock_table.query.return_value = {"Items": [briefing]}
+        response = _invoke_lambda("/news/2026-08-28")
+
+    body = json.loads(response["body"])
+    assert body["date"] == "2026-08-28"
