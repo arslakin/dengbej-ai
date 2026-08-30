@@ -18,6 +18,7 @@ import io
 import sys
 import os
 import wave
+from decimal import Decimal
 from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -820,7 +821,9 @@ def test_batch_execute_stores_ku_only(mock_briefing, mock_program, mock_s3, mock
         "script_ku": "Rojbaş.", "story_count": 2,
     } if pid == "world" else None
 
-    with patch.dict("sys.modules", {"kurdish_tts": MagicMock()}) as _:
+    with patch.dict("sys.modules", {"kurdish_tts": MagicMock()}) as _, \
+         patch("quota.reserve", return_value=True), \
+         patch("quota.get_usage", return_value=0):
         import sys
         sys.modules["kurdish_tts"].synthesize_kurdish.return_value = FAKE_WAV
 
@@ -974,3 +977,183 @@ def test_quota_reserve_zero_chars():
     """Reserving zero chars should succeed trivially."""
     import quota
     assert quota.reserve(0) is True
+
+
+# ─── Integration: Fail-closed quota + dry-run zero side effects ──────────────
+
+@patch("lambda_function.s3_client")
+@patch("lambda_function._update_program_ku_audio")
+@patch("lambda_function._update_briefing_ku_audio")
+@patch("lambda_function._get_program_for_batch")
+@patch("lambda_function._get_briefing_for_batch")
+@patch("quota.boto3.resource")
+def test_dry_run_zero_side_effects_integration(mock_quota_res, mock_briefing, mock_program,
+                                               mock_upd_brief, mock_upd_prog, mock_s3):
+    """
+    Integration: a dry run through the real lambda_handler must make
+    zero synthesis calls, zero quota writes, zero S3 writes, zero DB updates.
+    """
+    from lambda_function import lambda_handler
+    import quota
+    quota._dynamodb = None
+
+    # Quota table mock — record update_item calls
+    mock_quota_table = MagicMock()
+    mock_quota_res.return_value.Table.return_value = mock_quota_table
+    mock_quota_table.get_item.return_value = {"Item": {"chars_used": Decimal("9915")}}
+
+    mock_briefing.return_value = {
+        "briefing_date": "2026-08-29", "generated_at": "T",
+        "daily_audio_script_ku": "Rojbaş. " * 50,
+        "daily_audio_meta": {},
+    }
+    mock_program.side_effect = lambda pid, d: {
+        "program_id": pid, "briefing_date": d,
+        "script_ku": "Nûçe.", "story_count": 3,
+    } if pid == "world" else None
+
+    with patch.dict("sys.modules", {"kurdish_tts": MagicMock()}) as _:
+        import sys
+        ku_mock = sys.modules["kurdish_tts"]
+        ku_mock.synthesize_kurdish = MagicMock()
+
+        result = lambda_handler({
+            "generate_kurdish_batch": True,
+            "max_chars": 18000,
+            "dry_run": True,
+            "date": "2026-08-29",
+            "request_id": "DRYRUN-TEST-001",
+        }, None)
+
+    assert result["statusCode"] == 200
+    assert result["body"]["status"] == "dry_run"
+    assert result["body"]["request_id"] == "DRYRUN-TEST-001"
+    # Zero synthesis
+    ku_mock.synthesize_kurdish.assert_not_called()
+    # Zero S3
+    mock_s3.put_object.assert_not_called()
+    # Zero DB audio updates
+    mock_upd_brief.assert_not_called()
+    mock_upd_prog.assert_not_called()
+    # Zero quota WRITES (get_item for reading is allowed, update_item is not)
+    mock_quota_table.update_item.assert_not_called()
+
+
+@patch("lambda_function.s3_client")
+@patch("lambda_function._update_program_ku_audio")
+@patch("lambda_function._get_program_for_batch")
+@patch("lambda_function._get_briefing_for_batch")
+def test_fail_closed_when_reservation_raises(mock_briefing, mock_program, mock_upd_prog, mock_s3):
+    """
+    Fail-closed: if quota_reserve raises, synthesis must NOT happen.
+    """
+    from lambda_function import lambda_handler
+
+    mock_briefing.return_value = None
+    mock_program.side_effect = lambda pid, d: {
+        "program_id": pid, "briefing_date": d,
+        "script_ku": "Nûçe.", "story_count": 3,
+    } if pid == "world" else None
+
+    with patch.dict("sys.modules", {"kurdish_tts": MagicMock()}) as _, \
+         patch("quota.reserve", side_effect=Exception("DynamoDB unavailable")):
+        import sys
+        ku_mock = sys.modules["kurdish_tts"]
+        ku_mock.synthesize_kurdish = MagicMock()
+
+        result = lambda_handler({
+            "generate_kurdish_batch": True,
+            "max_chars": 18000,
+            "dry_run": False,
+            "date": "2026-08-29",
+        }, None)
+
+    # Synthesis must never have been called (fail closed)
+    ku_mock.synthesize_kurdish.assert_not_called()
+    mock_s3.put_object.assert_not_called()
+    # Result should show skipped with reservation reason
+    statuses = [r["status"] for r in result["body"]["results"]]
+    assert all(s == "skipped" for s in statuses)
+    assert result["body"]["chars_consumed"] == 0
+
+
+@patch("lambda_function.s3_client")
+@patch("lambda_function._update_program_ku_audio")
+@patch("lambda_function._get_program_for_batch")
+@patch("lambda_function._get_briefing_for_batch")
+def test_fail_closed_when_reservation_returns_false(mock_briefing, mock_program, mock_upd_prog, mock_s3):
+    """
+    Fail-closed: if quota_reserve returns False (budget exceeded), skip synthesis.
+    """
+    from lambda_function import lambda_handler
+
+    mock_briefing.return_value = None
+    mock_program.side_effect = lambda pid, d: {
+        "program_id": pid, "briefing_date": d,
+        "script_ku": "Nûçe.", "story_count": 3,
+    } if pid == "world" else None
+
+    with patch.dict("sys.modules", {"kurdish_tts": MagicMock()}) as _, \
+         patch("quota.reserve", return_value=False):
+        import sys
+        ku_mock = sys.modules["kurdish_tts"]
+        ku_mock.synthesize_kurdish = MagicMock()
+
+        result = lambda_handler({
+            "generate_kurdish_batch": True,
+            "max_chars": 18000,
+            "dry_run": False,
+            "date": "2026-08-29",
+        }, None)
+
+    ku_mock.synthesize_kurdish.assert_not_called()
+    mock_s3.put_object.assert_not_called()
+    assert result["body"]["chars_consumed"] == 0
+
+
+@patch("lambda_function.s3_client")
+@patch("lambda_function._update_program_ku_audio")
+@patch("lambda_function._get_program_for_batch")
+@patch("lambda_function._get_briefing_for_batch")
+def test_reservation_confirmed_before_synthesis(mock_briefing, mock_program, mock_upd_prog, mock_s3):
+    """
+    Reservation must be confirmed via get_usage before synthesis proceeds.
+    If confirmation fails, refund and skip.
+    """
+    from lambda_function import lambda_handler
+
+    mock_briefing.return_value = None
+    mock_program.side_effect = lambda pid, d: {
+        "program_id": pid, "briefing_date": d,
+        "script_ku": "Nûçe.", "story_count": 3,
+    } if pid == "world" else None
+
+    # get_usage: first call (top of handler, reads current usage) succeeds,
+    # subsequent calls (confirmation after reserve) raise.
+    usage_calls = [0]
+    def usage_side_effect(*a, **k):
+        usage_calls[0] += 1
+        if usage_calls[0] == 1:
+            return 0  # initial read
+        raise Exception("cannot confirm")
+
+    with patch.dict("sys.modules", {"kurdish_tts": MagicMock()}) as _, \
+         patch("quota.reserve", return_value=True), \
+         patch("quota.get_usage", side_effect=usage_side_effect), \
+         patch("quota.refund") as mock_refund:
+        import sys
+        ku_mock = sys.modules["kurdish_tts"]
+        ku_mock.synthesize_kurdish = MagicMock()
+
+        result = lambda_handler({
+            "generate_kurdish_batch": True,
+            "max_chars": 18000,
+            "dry_run": False,
+            "date": "2026-08-29",
+        }, None)
+
+    # Reservation succeeded but confirmation failed -> refund + skip, no synthesis
+    ku_mock.synthesize_kurdish.assert_not_called()
+    mock_refund.assert_called()
+    statuses = [r["status"] for r in result["body"]["results"]]
+    assert all(s == "skipped" for s in statuses)

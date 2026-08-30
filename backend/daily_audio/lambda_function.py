@@ -227,8 +227,11 @@ def handle_kurdish_batch(event):
         selected.append(c)
         total_chars += c["chars"]
 
+    request_id = event.get("request_id", "")
+
     report = {
         "status": "dry_run" if dry_run else "completed",
+        "request_id": request_id,
         "date": target_date,
         "budget_remaining": budget_remaining,
         "candidates_found": len(candidates),
@@ -240,23 +243,42 @@ def handle_kurdish_batch(event):
     }
 
     if dry_run:
+        # Dry run: report only. Zero synthesis, zero quota writes, zero S3, zero DB updates.
+        print(f"DRY_RUN request_id={request_id}: {len(selected)} candidates, {total_chars} chars — NO synthesis, NO quota write, NO S3, NO DB update")
         return {"statusCode": 200, "body": report}
 
-    # Execute synthesis with atomic quota reservation
+    # ── EXECUTION PATH (only reached when dry_run is False) ──
+    # Synthesis imports are deferred to here so a dry run never touches the
+    # synthesis module or its dependencies.
     from kurdish_tts import synthesize_kurdish
     results = []
 
     for c in selected:
-        # Reserve quota atomically before calling the API
-        reserved = False
+        # FAIL CLOSED: reservation must be confirmed in DynamoDB before any
+        # synthesis. If the reservation cannot be confirmed for ANY reason
+        # (quota exceeded, DynamoDB error, IAM failure), skip — never synthesize.
         try:
             reserved = quota_reserve(c["chars"], month_key)
-        except Exception:
-            reserved = True  # If quota check fails, proceed cautiously
+        except Exception as e:
+            reserved = False
+            print(f"  Batch: {c['program_id']} reservation error (fail-closed): {str(e)[:80]}")
 
         if not reserved:
-            results.append({"program_id": c["program_id"], "chars": c["chars"], "status": "skipped", "reason": "quota_exceeded"})
-            print(f"  Batch: {c['program_id']} skipped (quota would be exceeded)")
+            results.append({"program_id": c["program_id"], "chars": c["chars"], "status": "skipped", "reason": "reservation_not_confirmed"})
+            print(f"  Batch: {c['program_id']} skipped (reservation not confirmed)")
+            continue
+
+        # Confirm the reservation actually persisted before spending characters
+        try:
+            confirmed_usage = get_usage(month_key)
+        except Exception as e:
+            # Cannot confirm — refund and skip (fail closed)
+            try:
+                quota_refund(c["chars"], month_key)
+            except Exception:
+                pass
+            results.append({"program_id": c["program_id"], "chars": c["chars"], "status": "skipped", "reason": "reservation_unconfirmable"})
+            print(f"  Batch: {c['program_id']} skipped (could not confirm reservation): {str(e)[:80]}")
             continue
 
         try:
@@ -281,7 +303,7 @@ def handle_kurdish_batch(event):
             print(f"  Batch: {c['program_id']} synthesized ({c['chars']} chars)")
 
         except Exception as e:
-            # Refund the reservation on failure
+            # Refund the confirmed reservation on failure
             try:
                 quota_refund(c["chars"], month_key)
             except Exception:
@@ -293,7 +315,10 @@ def handle_kurdish_batch(event):
     report["status"] = "completed"
     report["results"] = results
     report["chars_consumed"] = chars_consumed
-    report["new_monthly_total"] = chars_already_used + chars_consumed
+    try:
+        report["new_monthly_total"] = get_usage(month_key)
+    except Exception:
+        report["new_monthly_total"] = chars_already_used + chars_consumed
 
     return {"statusCode": 200, "body": report}
 
