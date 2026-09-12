@@ -24,6 +24,7 @@ TEST_SUITES = [
     "backend/program_generator/tests",
     "backend/todays_five_curator/tests",
     "backend/todays_five_processor/tests",
+    "frontend/tests",
 ]
 
 ROOT = Path(__file__).parent

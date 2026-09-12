@@ -1,173 +1,178 @@
-# Dengbej AI
+# Dengbêj AI — Kurdish News Radio
 
-## Project Article
+Dengbêj AI is an experimental, no-login **Kurdish news radio** inspired by the
+dengbêj oral storytelling tradition. It automatically curates world news,
+retells it as short Kurmanji Kurdish broadcasts, and plays it back as a
+continuous radio experience.
 
-This project was built for the **AWS 10,000 AIdeas Competition**. Read the full article on AWS Builder Center:
-
-[Dengbej AI – Kurdish Storytelling with Generative AI](https://builder.aws.com/content/3AtwFZmEnbM4cs3I7y25DHJyJlo/aideas-dengbej-ai-kurdish-storytelling-with-generative-ai)
+> Developed through the **AWS Builder Challenges**.
+> Article: [Dengbej AI – Kurdish Storytelling with Generative AI](https://builder.aws.com/content/3AtwFZmEnbM4cs3I7y25DHJyJlo/aideas-dengbej-ai-kurdish-storytelling-with-generative-ai)
 
 ---
 
-Dengbej AI is an experimental storytelling platform inspired by the Kurdish dengbêj oral tradition. The project explores how AI can transform written articles into short narrated audio stories, making content more accessible and engaging through the power of voice.
+## The Bêje Experience
 
-## About Dengbêj
+The homepage is built around a single interaction:
 
-Dengbêj is a traditional Kurdish oral storytelling art form where storytellers (dengbêjs) narrate historical events, legends, and cultural tales. This project honors that tradition by using modern AI to help preserve and extend the art of oral storytelling.
+**Choose a program → Bêje! / Tell me! → the program appears and plays**
 
-## What It Does
+- **Bilingual UI** — English and Kurmanji (`Kurdî`), toggled live.
+- **Programs** — Today's News plus regional/topic programs (World, Middle East,
+  Turkey, and the Kurdish regions: Bakur, Rojava, Başûr, Rojhilat, and a
+  cross-regional Kurdistan program).
+- **Kurmanji narration** — Selected programs are narrated in Kurmanji via
+  KurdishTTS, with English (Amazon Polly) narration as a fallback when Kurmanji
+  audio is not yet available.
+- **Continuous radio** — Play, pause, next, previous, and automatic advancement
+  through programs.
+- **Freshness** — Each briefing shows whether it was updated recently, X hours
+  ago, or is an archive edition, based on the record timestamp (not the browser
+  clock).
 
-Dengbej AI takes any text input and:
-1. Summarizes it into a compelling short story using AI
-2. Translates the summary into Kurdish (Kurmanji dialect)
-3. Converts the English summary into natural-sounding speech
-4. Delivers both text versions and audio you can listen to immediately
+## What is a Dengbêj?
 
-Perfect for turning long articles, blog posts, or documents into bilingual audio summaries.
+For centuries, dengbêjs have preserved Kurdish history through oral
+storytelling — sharing news, memories, and culture through spoken narratives
+that connect communities. Dengbêj AI reimagines that tradition with generative
+AI and serverless AWS technology.
 
-## Features
-
-- **AI-Powered Summarization** – Intelligent text condensation using Amazon Bedrock (Claude 3.5 Haiku)
-- **Bilingual Output** – Get both English and Kurdish (Kurmanji) text versions
-- **Natural Voice Narration** – High-quality English text-to-speech with Amazon Polly
-- **Instant Audio Generation** – Get your story in seconds
-- **Serverless Architecture** – Scalable, cost-effective AWS infrastructure
-- **Simple Web Interface** – No installation required, just paste and listen
+---
 
 ## Architecture
 
-```
-┌─────────────────┐
-│  Web Frontend   │
-│   (HTML/JS)     │
-└────────┬────────┘
-         │ HTTPS POST
-         ↓
-┌─────────────────┐
-│  AWS Lambda     │
-│  Function URL   │
-└────────┬────────┘
-         │
-         ├──→ Amazon Bedrock (Claude 3.5 Haiku)
-         │    • Text summarization
-         │    • Kurdish translation
-         │
-         ├──→ Amazon Polly
-         │    • English text-to-speech
-         │    • Audio generation
-         │
-         └──→ Amazon S3
-              • Audio file storage
-              • Public URL generation
-```
-
-## Tech Stack
-
-### Frontend
-- HTML5
-- Vanilla JavaScript
-- CSS3
-
-### Backend (AWS)
-- **AWS Lambda** – Serverless compute
-- **Amazon Bedrock** – AI/ML models (Claude 3.5 Haiku)
-- **Amazon Polly** – Neural text-to-speech
-- **Amazon S3** – Object storage
-- **Lambda Function URLs** – Public HTTP endpoint
-
-### Language
-- Python 3.x (Lambda runtime)
-
-## Getting Started
-
-### Prerequisites
-- AWS Account with access to:
-  - Amazon Bedrock (Claude 3.5 Haiku model enabled)
-  - AWS Lambda
-  - Amazon Polly
-  - Amazon S3
-- Basic knowledge of AWS services
-
-### Setup
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/your-org/dengbej-ai.git
-   cd dengbej-ai
-   ```
-
-2. **Deploy the Lambda function**
-   - Create a new Lambda function in AWS Console
-   - Upload the backend code (Python)
-   - Configure IAM role with permissions for Bedrock, Polly, and S3
-   - Enable Lambda Function URL with CORS
-
-3. **Create S3 bucket**
-   - Create a bucket for audio storage
-   - Enable public read access for generated audio files
-   - Configure CORS settings
-
-4. **Update frontend configuration**
-   - Open `frontend/index.html`
-   - Replace the `lambdaURL` with your Lambda Function URL
-
-5. **Open the frontend**
-   - Open `frontend/index.html` in a web browser
-   - Or deploy to any static hosting service
-
-## Usage
-
-1. Open the Dengbej AI web interface
-2. Paste any text into the text area (article, blog post, story, etc.)
-3. Click "Generate Dengbej Story"
-4. Wait a few seconds for AI processing
-5. Read both the English summary and Kurdish translation
-6. Listen to the English audio narration
-
-## Project Structure
+A fully serverless pipeline. Each stage is an independent AWS Lambda function,
+orchestrated by Amazon EventBridge schedules.
 
 ```
-dengbej-ai/
-├── frontend/           # Web interface
-│   └── index.html     # Single-page application
-├── backend/           # AWS Lambda function code
-├── infrastructure/    # Infrastructure as Code (future)
-├── docs/             # Documentation and progress logs
-│   └── progress.md   # Development timeline
-├── mp3/              # Sample audio files
-└── README.md         # This file
+RSS Feeds (BBC, DW, Al Jazeera)
+    │  every 6 hours
+    ▼
+News Ingester (Lambda) ──────────────► dengbej-articles (DynamoDB)
+    │  06:00 / 18:00 UTC
+    ▼
+Today's 5 Curator (Lambda + Bedrock) ─► dengbej-briefings (DynamoDB)
+    │  ~15 min later
+    ▼
+Story Processor (Lambda + Bedrock)     summaries + Kurmanji translation
+    │
+    ▼
+Program Generator (Lambda + Bedrock)  ─► dengbej-programs (DynamoDB)
+    │                                     classification + Kurmanji scripts + headline_ku
+    ▼
+Daily Audio (Lambda + Bedrock + KurdishTTS / Polly)
+    │  Kurmanji WAV (KurdishTTS), English MP3 fallback (Polly)
+    ▼
+Audio Storage (S3, public read) ──────► News API (Lambda, Function URL)
+                                             │
+                                             ▼
+                                   Frontend (AWS Amplify)
 ```
 
-## Roadmap
+### AWS services
 
-- [ ] Add multilingual translation support
-- [ ] Implement voice selection options
-- [ ] Add story length customization
-- [ ] Create Infrastructure as Code (Terraform/CloudFormation)
-- [ ] Add user authentication
-- [ ] Implement story history and favorites
-- [ ] Support multiple AI models
-- [ ] Add batch processing capabilities
+| Service | Role |
+|---------|------|
+| Amazon Bedrock (Claude Haiku) | Summarization, Kurmanji translation, broadcast scripts, headline translation |
+| KurdishTTS | Kurmanji (Kurdî) speech synthesis |
+| Amazon Polly | English narration fallback |
+| AWS Lambda | All compute (ingester, curator, processor, program generator, daily audio, news API) |
+| Amazon DynamoDB | Articles, briefings, programs, and the monthly TTS quota record |
+| Amazon EventBridge | Scheduled pipeline triggers |
+| Amazon S3 | Audio storage (public read) |
+| AWS Amplify | Static frontend hosting + previews |
 
-## Development
+### Data model highlights
 
-This project is being developed for the **AWS 10,000 AIdeas Competition** and explores how modern AI tools can support storytelling and accessible media.
+- `dengbej-briefings` — Today's 5 briefing per day; `daily_audio_meta` holds
+  `audio_url` (legacy = English), `audio_url_en`, and `audio_url_ku`.
+- `dengbej-programs` — Per-program briefings with `script_ku`, `headline_ku`,
+  and `audio_url_ku`. The synthetic `tts-quota` / `YYYY-MM` record tracks monthly
+  KurdishTTS character usage.
 
-See [docs/progress.md](docs/progress.md) for detailed development timeline.
+The News API returns `url`, `url_en`, and `url_ku` for both briefings and
+programs so the frontend can select audio by language. Legacy `url` always
+points to English so older/frozen clients keep working.
 
-## Contributing
+---
 
-Contributions are welcome! Please feel free to submit issues or pull requests.
+## KurdishTTS Integration & Quota Safeguards
 
-## License
+Kurmanji narration is generated via the [KurdishTTS](https://www.kurdishtts.com)
+API (`POST /api/tts-proxy`, WAV output, `kurmanji_…` speaker).
 
-See [LICENSE](LICENSE) file for details.
+- **Disabled by default in scheduled runs** — `KURDISH_TTS_ENABLED=false`. Kurdish
+  audio is produced only via a controlled batch event.
+- **API key** — read server-side from AWS Secrets Manager
+  (`dengbej-ai/kurdish-tts-api-key`). Never in source, logs, or the frontend.
+- **Monthly budget** — `KURDISH_TTS_MONTHLY_BUDGET_CHARS` (default 18,000, a
+  safety margin below the free-tier allowance). Tracked atomically in DynamoDB.
+- **Fail closed** — synthesis never begins unless a character reservation is
+  confirmed persisted in DynamoDB; any error → skip (with refund).
+- **Dry run** — `generate_kurdish_batch` with `dry_run:true` reports candidates
+  and character totals while making **zero** synthesis calls, quota writes, S3
+  writes, or DynamoDB updates.
+- **WAV assembly** — long scripts are chunked at sentence boundaries (≤480 chars
+  free-tier / configurable) and reassembled into one valid WAV via the standard
+  `wave` module.
+- **Speed** — `KURDISH_TTS_SPEED` (default `1.1`), validated against the API
+  range and safely defaulted.
 
-## Acknowledgments
+Kurdish narration is a **beta**. English Polly narration remains the reliable
+fallback and is never overwritten.
 
-- Inspired by the Kurdish dengbêj oral storytelling tradition
-- Built with AWS AI/ML services
-- Developed for AWS 10,000 AIdeas Competition
+---
 
-## Contact
+## Branches
 
-For questions or feedback about this project, please open an issue on GitHub.
+| Branch | Purpose |
+|--------|---------|
+| `feature/beje-radio-v2` | Current Bêje radio app (Kurmanji + English) — the working line |
+| `feature/kurmanji-tts` | KurdishTTS integration development branch |
+| `feature/public-beta-polish` | Public-beta improvements (audio selection, freshness, copy) |
+| `feature/aws-builder-challenge` | Frozen challenge submission — **do not modify** |
+| `feature/aws-builder-release` | Frozen release snapshot — **do not modify** |
+| `backup/kiro-experimental-api-processor` | Archived experimental approach |
+
+---
+
+## Testing
+
+All backend Lambdas and the frontend have test suites. Each Lambda uses the same
+`lambda_function.py` filename, so tests run per-directory to avoid import
+collisions.
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install boto3 requests beautifulsoup4 feedparser pytest
+python run_tests.py            # runs every suite
+python run_tests.py -v         # verbose
+```
+
+Frontend tests (in `frontend/tests/`) validate HTML/CSS/JS structure, public
+copy, the freshness indicator, and language-aware audio selection. The audio
+logic is executed with Node when available.
+
+Tests never make live Bedrock, Polly, or KurdishTTS calls — external clients are
+mocked (see the autouse `conftest.py` fixtures). Running the suite consumes **no**
+TTS quota.
+
+---
+
+## Safety Boundaries
+
+- No authentication, subscriptions, ads, or personalization.
+- Kurdish TTS is off in scheduled runs; audio is generated only through the
+  controlled, budgeted batch event.
+- The API key is confined to Secrets Manager and never logged or shipped.
+- Frozen challenge branches are never modified.
+- The stable V2 deployment is only changed through reviewed branch merges.
+
+---
+
+## Roadmap (near-term)
+
+- Evaluate and finalize the Kurmanji speaker for naturalness and pronunciation.
+- Harden the quota reservation counter before enabling scheduled Kurdish synthesis.
+- Convert long WAV output to a compressed format (e.g. Opus) to cut bandwidth.
+- Expand Kurmanji narration coverage across all programs once quota allows.
+- Backfill Kurdish audio for daily briefings on a controlled cadence.

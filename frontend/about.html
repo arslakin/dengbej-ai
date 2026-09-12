@@ -157,14 +157,15 @@
     <section class="content-section">
       <h2 id="h-project">About This Project</h2>
       <p id="p-project-1">Dengbêj AI uses generative AI to create Kurdish news radio programs from current events. It fetches global news, summarizes and translates stories into Kurdish Kurmanji, and generates audio narration — all automatically, twice daily.</p>
-      <p id="p-project-2">Built for the AWS 10,000 AIdeas Weekend Challenge, this project demonstrates how serverless architecture and foundation models can serve under-resourced languages and preserve cultural traditions in new forms.</p>
+      <p id="p-project-2">Developed through the AWS Builder Challenges, this project demonstrates how serverless architecture and foundation models can serve under-resourced languages and preserve cultural traditions in new forms.</p>
     </section>
 
     <section class="content-section">
       <h2 id="h-services">AWS Services Used</h2>
       <ul id="services-list">
         <li><span class="service-name">Amazon Bedrock</span><span class="service-desc">Story summarization, Kurdish translation, and broadcast script generation using foundation models.</span></li>
-        <li><span class="service-name">Amazon Polly</span><span class="service-desc">English narration audio synthesis for daily news programs.</span></li>
+        <li><span class="service-name">KurdishTTS</span><span class="service-desc">Kurmanji Kurdish speech synthesis for narrated programs.</span></li>
+        <li><span class="service-name">Amazon Polly</span><span class="service-desc">English narration used as a fallback when Kurmanji audio is not yet available.</span></li>
         <li><span class="service-name">AWS Lambda</span><span class="service-desc">Serverless compute for all pipeline stages — ingestion, curation, translation, and audio generation.</span></li>
         <li><span class="service-name">Amazon DynamoDB</span><span class="service-desc">Storage for articles, briefings, and program data with fast key-value access.</span></li>
         <li><span class="service-name">Amazon EventBridge</span><span class="service-desc">Scheduled pipeline automation triggering ingestion and curation on a fixed cadence.</span></li>
@@ -237,7 +238,7 @@
           ku: "Dengb\u00EAj AI bi AI-a afirîner bernam\u00EAn radyoya n\u00FB\u00E7ey\u00EAn Kurdî ji bûyer\u00EAn rojane \u00E7\u00EAdike. Ew n\u00FB\u00E7ey\u00EAn cîhanî digire, kurt dike û bi Kurmancî werdig\u00EAre, û deng\u00EA vegotinê çêdike \u2014 hemû bi ot\u00EAmatîk, du caran rojane."
         },
         "p-project-2": {
-          en: "Built for the AWS 10,000 AIdeas Weekend Challenge, this project demonstrates how serverless architecture and foundation models can serve under-resourced languages and preserve cultural traditions in new forms.",
+          en: "Developed through the AWS Builder Challenges, this project demonstrates how serverless architecture and foundation models can serve under-resourced languages and preserve cultural traditions in new forms.",
           ku: "Ji bo Pêşbaziya AWS 10,000 AIdeas hat\u00EE avakirin, ev proje n\u00EE\u015Fan dide ku mîmariya serverless û model\u00EAn bin\u00EAretî \u00E7awa dikarin xizmet\u00EA zimanan kêm-\u00E7avkanî bikin \u00FB kevne\u015Fopiy\u00EAn \u00E7andî bi form\u00EAn nû bipar\u00EAzin."
         },
         "h-services": { en: "AWS Services Used", ku: "Xizmet\u00EAn AWS" },

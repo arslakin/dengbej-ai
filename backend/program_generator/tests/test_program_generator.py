@@ -298,7 +298,8 @@ def test_multiple_programs_generated():
     ]
 
     with patch("lambda_function.articles_table") as mock_articles, \
-         patch("lambda_function.programs_table") as mock_programs:
+         patch("lambda_function.programs_table") as mock_programs, \
+         patch("lambda_function.invoke_bedrock", return_value="Rojbaş. Ev Dengbêj e."):
         mock_articles.scan.return_value = {"Items": articles}
         mock_programs.get_item.return_value = {}
         mock_programs.put_item.return_value = {}
