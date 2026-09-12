@@ -218,9 +218,9 @@
       <div class="pipeline-arrow"><span aria-hidden="true">&#8595;</span></div>
 
       <div class="pipeline-step">
-        <div class="pipeline-step-service">Lambda + Bedrock + Polly</div>
+        <div class="pipeline-step-service">Lambda + Bedrock + KurdishTTS / Polly</div>
         <div class="pipeline-step-name" id="step-8-name">Daily Audio</div>
-        <div class="pipeline-step-desc" id="step-8-desc">Generates a narration script and synthesizes English audio via Amazon Polly.</div>
+        <div class="pipeline-step-desc" id="step-8-desc">Generates a narration script, synthesizes Kurmanji audio via KurdishTTS, and falls back to English via Amazon Polly.</div>
       </div>
       <div class="pipeline-arrow"><span aria-hidden="true">&#8595;</span></div>
 
@@ -301,7 +301,7 @@
         "step-7-name": { en: "Program Generator", ku: "Çêkera Bernameyan" },
         "step-7-desc": { en: "Classifies stories into regional programs and generates broadcast scripts.", ku: "N\u00FB\u00E7eyan li gorî herêman dabeş dike \u00FB niv\u00EEsara weşanê \u00E7\u00EAdike." },
         "step-8-name": { en: "Daily Audio", ku: "Deng\u00EA Rojane" },
-        "step-8-desc": { en: "Generates a narration script and synthesizes English audio via Amazon Polly.", ku: "Niv\u00EEsara vegotinê \u00E7\u00EAdike \u00FB deng\u00EA \u00CEngilîzî bi Amazon Polly sentez dike." },
+        "step-8-desc": { en: "Generates a narration script, synthesizes Kurmanji audio via KurdishTTS, and falls back to English via Amazon Polly.", ku: "Niv\u00EEsara vegotinê \u00E7\u00EAdike, deng\u00EA Kurmanc\u00EE bi KurdishTTS sentez dike, \u00FB dema tune be vedigere \u00CEngil\u00EEz\u00EE bi Amazon Polly." },
         "step-9-name": { en: "Audio Storage", ku: "Depoya Deng" },
         "step-9-desc": { en: "MP3 files stored in S3 with public read access for streaming.", ku: "Pel\u00EAn MP3 li S3-ê bi gihî\u015Ftina giştî ji bo streaming t\u00EAn hilanîn." },
         "step-10-name": { en: "News API", ku: "API-ya N\u00FB\u00E7eyan" },
