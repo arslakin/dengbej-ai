@@ -126,6 +126,98 @@ def test_freshness_css_classes_present():
     assert ".freshness.archive" in css
 
 
+# ─── Freshness boundary logic (executed via node) ────────────────────────────
+
+def _run_freshness(hours_ago, lang="en"):
+    """Execute computeFreshness with a generated_at that is `hours_ago` old."""
+    js = _extract_script(_read(INDEX_HTML))
+    m = re.search(r"function computeFreshness\(generatedAtIso\) \{(.*?)\n      \}", js, re.DOTALL)
+    assert m, "computeFreshness not found"
+    fn_body = m.group(1)
+    harness = (
+        'var currentLang = "' + lang + '";\n'
+        "function computeFreshness(generatedAtIso) {" + fn_body + "\n}\n"
+        "var d = new Date(Date.now() - " + str(hours_ago) + " * 3600000);\n"
+        "var r = computeFreshness(d.toISOString());\n"
+        "console.log(JSON.stringify(r));\n"
+    )
+    tmp = "/tmp/_dengbej_freshness.js"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(harness)
+    result = subprocess.run([NODE, tmp], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    import json
+    return json.loads(result.stdout.strip())
+
+
+@pytest.mark.skipif(NODE is None, reason="node not available")
+def test_freshness_under_2h_is_recent():
+    r = _run_freshness(0.5)
+    assert r["cls"] == "fresh"
+    assert r["text"] == "Updated recently"
+
+
+@pytest.mark.skipif(NODE is None, reason="node not available")
+def test_freshness_just_under_2h_boundary():
+    r = _run_freshness(1.9)
+    assert r["cls"] == "fresh"
+
+
+@pytest.mark.skipif(NODE is None, reason="node not available")
+def test_freshness_at_2h_is_hours_ago():
+    r = _run_freshness(2.1)
+    assert r["cls"] == "recent"
+    assert "hours ago" in r["text"]
+
+
+@pytest.mark.skipif(NODE is None, reason="node not available")
+def test_freshness_mid_range_9h():
+    """A 9-hour-old briefing (like today's live) must NOT be archived."""
+    r = _run_freshness(9)
+    assert r["cls"] == "recent"
+    assert r["text"] == "Updated 9 hours ago"
+
+
+@pytest.mark.skipif(NODE is None, reason="node not available")
+def test_freshness_just_under_30h_boundary():
+    r = _run_freshness(29.5)
+    assert r["cls"] == "recent"
+
+
+@pytest.mark.skipif(NODE is None, reason="node not available")
+def test_freshness_over_30h_is_archive():
+    r = _run_freshness(31)
+    assert r["cls"] == "archive"
+    assert r["text"] == "Archive edition"
+
+
+@pytest.mark.skipif(NODE is None, reason="node not available")
+def test_freshness_kurdish_labels():
+    fresh = _run_freshness(0.5, "ku")
+    assert "N\u00fb" in fresh["text"] or "rojane" in fresh["text"]
+    archive = _run_freshness(50, "ku")
+    assert "ar\u015f\u00eev" in archive["text"].lower()
+
+
+@pytest.mark.skipif(NODE is None, reason="node not available")
+def test_freshness_null_when_no_timestamp():
+    js = _extract_script(_read(INDEX_HTML))
+    m = re.search(r"function computeFreshness\(generatedAtIso\) \{(.*?)\n      \}", js, re.DOTALL)
+    fn_body = m.group(1)
+    harness = (
+        'var currentLang = "en";\n'
+        "function computeFreshness(generatedAtIso) {" + fn_body + "\n}\n"
+        "console.log(JSON.stringify(computeFreshness(null)));\n"
+    )
+    tmp = "/tmp/_dengbej_freshness_null.js"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(harness)
+    result = subprocess.run([NODE, tmp], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    import json
+    assert json.loads(result.stdout.strip()) is None
+
+
 # ─── Player entry points route through selectAudioUrl ────────────────────────
 
 def test_all_player_entry_points_use_select_audio_url():

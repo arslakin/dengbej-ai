@@ -520,10 +520,11 @@
         var hours = (Date.now() - then.getTime()) / 3600000;
 
         if (hours < 0) hours = 0;
-        if (hours < 6) {
+        // Boundaries: < 2h recently · 2–30h X hours ago · > 30h archive
+        if (hours < 2) {
           return { cls: "fresh", text: currentLang === "ku" ? "Nû hate rojanekirin" : "Updated recently" };
         }
-        if (hours < 48) {
+        if (hours <= 30) {
           var h = Math.round(hours);
           return {
             cls: "recent",
