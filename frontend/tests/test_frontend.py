@@ -134,7 +134,8 @@ def test_about_page_is_listener_facing():
     # Keeps the dengbêj story and the audio fallback disclosure
     assert "dengbêj" in html.lower()
     assert "kurmanji" in html.lower()
-    assert "falls back to english" in html.lower()
+    assert "offers english narration if one exists" in html.lower()
+    assert "some programs may have no audio yet" in html.lower()
 
 
 def test_howitworks_redirects_to_transparency():
