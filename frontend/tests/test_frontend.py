@@ -200,6 +200,13 @@ def test_nav_has_accessible_labels(name, path):
 
 # ─── Trust pages: bilingual copy ─────────────────────────────────────────────
 
+def test_home_ai_disclaimer_changes_with_language():
+    """The prominent AI warning must not remain English in Kurdish mode."""
+    html = _read(INDEX_HTML)
+    assert 'id="submission-disclaimer"' in html
+    assert 'document.getElementById("submission-disclaimer").textContent = lang === "ku"' in html
+
+
 @pytest.mark.parametrize("name,path", list(TRUST_PAGES.items()))
 def test_trust_page_has_language_toggle(name, path):
     html = _read(path)
