@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>About Dengbêj</title>
-  <meta name="description" content="About Dengbêj AI — a Kurdish news radio inspired by the dengbêj oral storytelling tradition, retelling the day's news in Kurmanji and English.">
+  <title>Contact · Dengbêj</title>
+  <meta name="description" content="How to reach Dengbêj AI and report corrections — through the project's public GitHub repository.">
   <style>
     :root {
       --text-primary: #111; --text-secondary: #444; --text-muted: #777;
@@ -65,6 +65,10 @@
     }
     .content-section p {
       font-size: 1rem; color: var(--text-secondary); line-height: 1.8; margin-bottom: 1rem;
+    }
+    .content-section ul { list-style: disc; padding-left: 1.25rem; }
+    .content-section li {
+      padding: 0.35rem 0; font-size: 0.95rem; color: var(--text-secondary); line-height: 1.6;
     }
     .content-section a { color: var(--link); }
     .content-section a:hover { color: var(--link-hover); }
@@ -129,25 +133,22 @@
   </header>
 
   <main class="container">
-    <h1 class="page-title" id="page-title">About Dengbêj</h1>
-    <p class="page-subtitle" id="page-subtitle">The story behind the storyteller.</p>
+    <h1 class="page-title" id="page-title">Contact</h1>
+    <p class="page-subtitle" id="page-subtitle">Reach us, and help us fix mistakes.</p>
 
     <section class="content-section">
-      <h2 id="h-dengbej">What is a Dengbêj?</h2>
-      <p id="p-dengbej-1">A dengbêj is a traditional Kurdish oral storyteller. For generations, dengbêjs have been the voice of their communities — recounting histories, delivering news from distant villages, and preserving collective memory through song and spoken word.</p>
-      <p id="p-dengbej-2">The tradition is especially strong in the Kurmanji-speaking regions. Without written archives, these storytellers carried entire histories in their voices, performing in gathering houses called "dîwanxane" where communities came together to listen.</p>
-      <p id="p-dengbej-3">Today, as the Kurdish language faces challenges in many regions, the dengbêj tradition stands for both cultural resistance and continuity — a reminder that stories survive through telling.</p>
+      <h2 id="h-github">Project Repository</h2>
+      <p id="p-github">Dengbêj AI is an open project. The most reliable way to reach the project — to report a mistake, suggest a source, or ask a question — is by opening an issue on the public GitHub repository: <a href="https://github.com/arslakin/dengbej-ai" id="link-repo" rel="noopener noreferrer" target="_blank">github.com/arslakin/dengbej-ai</a>.</p>
     </section>
 
     <section class="content-section">
-      <h2 id="h-project">What Dengbêj AI Is</h2>
-      <p id="p-project-1">Dengbêj AI is a Kurdish news radio. Each day it gathers world news and retells it as short broadcasts in Kurmanji Kurdish, so you can simply press play and listen — no account, no sign-up.</p>
-      <p id="p-project-2">The retellings are AI-assisted summaries, not original reporting, and every story links back to the publisher that reported it. You can read more about how this works, and how mistakes are corrected, on the <a href="/transparency" id="link-transparency">Transparency</a> page.</p>
+      <h2 id="h-corrections">Reporting a Correction</h2>
+      <p id="p-corrections">Because summaries and translations are AI-generated, mistakes happen. When you report one, it helps to include the story, what was inaccurate, and what it should say. See <a href="/transparency" id="link-transparency">Transparency</a> for how corrections are handled.</p>
     </section>
 
     <section class="content-section">
-      <h2 id="h-audio">Listening in Kurmanji and English</h2>
-      <p id="p-audio">Selected programs are narrated in Kurmanji. When a Kurmanji recording is not yet available for a program, the player falls back to English narration so there is always something to listen to. Kurdish narration keeps expanding over time.</p>
+      <h2 id="h-project">About the Project</h2>
+      <p id="p-project">You can read more about the background of Dengbêj AI in the accompanying article: <a href="https://builder.aws.com/content/3AtwFZmEnbM4cs3I7y25DHJyJlo/aideas-dengbej-ai-kurdish-storytelling-with-generative-ai" id="link-article" rel="noopener noreferrer" target="_blank">Dengbêj AI on AWS Builder</a>.</p>
     </section>
 
     <a href="/" class="back-link" id="back-link">&larr; Back to today's briefing</a>
@@ -179,40 +180,28 @@
       var btnKu = document.getElementById("btn-ku");
 
       var translations = {
-        "page-title": { en: "About Dengbêj", ku: "Der barê Dengbêj" },
-        "page-subtitle": { en: "The story behind the storyteller.", ku: "Çîroka li pey dengbêj." },
-        "h-dengbej": { en: "What is a Dengbêj?", ku: "Dengbêj çi ye?" },
-        "p-dengbej-1": {
-          en: "A dengbêj is a traditional Kurdish oral storyteller. For generations, dengbêjs have been the voice of their communities — recounting histories, delivering news from distant villages, and preserving collective memory through song and spoken word.",
-          ku: "Dengbêj çîrokbêjekî devî yê kevneşopî yê Kurd e. Bi nifşan, dengbêjan dengê civatên xwe bûne — dîrok vegotin, nûçeyên gundên dûr dan û bîranîna civakî bi stran û gotin parastin."
+        "page-title": { en: "Contact", ku: "Têkilî" },
+        "page-subtitle": { en: "Reach us, and help us fix mistakes.", ku: "Bigihîje me, û ji me re bibe alîkar ku em xeletiyan rast bikin." },
+        "h-github": { en: "Project Repository", ku: "Depoya projeyê" },
+        "p-github": {
+          en: "Dengbêj AI is an open project. The most reliable way to reach the project — to report a mistake, suggest a source, or ask a question — is by opening an issue on the public GitHub repository: github.com/arslakin/dengbej-ai.",
+          ku: "Dengbêj AI projeyek vekirî ye. Riya herî pêbawer a gihîştina projeyê — ji bo raportkirina xeletiyekê, pêşniyara çavkaniyekê, an pirsek — ev e ku tu mijarekê li ser depoya GitHub a gelemperî vekî: github.com/arslakin/dengbej-ai."
         },
-        "p-dengbej-2": {
-          en: "The tradition is especially strong in the Kurmanji-speaking regions. Without written archives, these storytellers carried entire histories in their voices, performing in gathering houses called \u201Cd\u00EEwanxane\u201D where communities came together to listen.",
-          ku: "Kevneşopî bi taybetî li herêmên Kurmancîaxêv xurt e. Bê arşîvên nivîskî, van çîrokbêjan hemû dîrok di dengê xwe de hilgirtin, li dîwanxaneyan — cihên civatê — ku civat li hev kom dibûn da ku guhdarî bikin."
+        "h-corrections": { en: "Reporting a Correction", ku: "Raportkirina rastkirinê" },
+        "p-corrections": {
+          en: "Because summaries and translations are AI-generated, mistakes happen. When you report one, it helps to include the story, what was inaccurate, and what it should say. See Transparency for how corrections are handled.",
+          ku: "Ji ber ku kurte û werger ji hêla AI ve têne çêkirin, xeletî çêdibin. Dema ku tu yekê raport dikî, alîkar e ku tu çîrokê, çi ne rast bû, û divê çi bibêje têxî nav. Ji bo çawa rastkirin têne birêvebirin li rûpela Şefafiyê binêre."
         },
-        "p-dengbej-3": {
-          en: "Today, as the Kurdish language faces challenges in many regions, the dengbêj tradition stands for both cultural resistance and continuity — a reminder that stories survive through telling.",
-          ku: "Îro, dema ku zimanê Kurdî li gelek herêman bi astengiyan re rû bi rû ye, kevneşopiya dengbêjî hem berxwedana çandî hem jî domdariyê temsîl dike — bîranînek ku çîrok bi vegotinê dijîn."
+        "h-project": { en: "About the Project", ku: "Der barê projeyê" },
+        "p-project": {
+          en: "You can read more about the background of Dengbêj AI in the accompanying article: Dengbêj AI on AWS Builder.",
+          ku: "Tu dikarî li ser paşxaneya Dengbêj AI di gotara pêvekirî de bêtir bixwînî: Dengbêj AI li ser AWS Builder."
         },
-        "h-project": { en: "What Dengbêj AI Is", ku: "Dengbêj AI çi ye" },
-        "p-project-1": {
-          en: "Dengbêj AI is a Kurdish news radio. Each day it gathers world news and retells it as short broadcasts in Kurmanji Kurdish, so you can simply press play and listen — no account, no sign-up.",
-          ku: "Dengbêj AI radyoyek nûçeyan a Kurdî ye. Her roj nûçeyên cîhanê berhev dike û wan wek weşanên kurt bi Kurmancî ji nû ve vedibêje, da ku tu tenê pêl lêxistinê bikî û guhdarî bikî — bê hîsab, bê tomarkirin."
-        },
-        "p-project-2": {
-          en: "The retellings are AI-assisted summaries, not original reporting, and every story links back to the publisher that reported it. You can read more about how this works, and how mistakes are corrected, on the Transparency page.",
-          ku: "Ji-nû-ve-vegotin kurteyên bi alîkariya AI ne, ne raportina orîjînal, û her çîrok vedigere weşangerê ku ew raportkiriye. Tu dikarî li ser vê çawa dixebite, û çawa xeletî têne rastkirin, li rûpela Şefafiyê bêtir bixwînî."
-        },
-        "h-audio": { en: "Listening in Kurmanji and English", ku: "Guhdarî bi Kurmancî û Îngilîzî" },
-        "p-audio": {
-          en: "Selected programs are narrated in Kurmanji. When a Kurmanji recording is not yet available for a program, the player falls back to English narration so there is always something to listen to. Kurdish narration keeps expanding over time.",
-          ku: "Hin bername bi Kurmancî têne vegotin. Dema ku tomarkirinek Kurmancî hîna ji bo bernameyekê tune be, lêdêr vedigere vegotina Îngilîzî da ku herdem tiştek hebe ku meriv guhdarî bike. Vegotina Kurdî bi demê re berfireh dibe."
-        },
-        "back-link": { en: "\u2190 Back to today\u2019s briefing", ku: "\u2190 Vegere nûçeyên îro" },
         "nav-home": { en: "Listen", ku: "Guhdarî" },
         "nav-about": { en: "About", ku: "Der barê" },
         "nav-sources": { en: "Sources", ku: "Çavkanî" },
         "nav-contact": { en: "Contact", ku: "Têkilî" },
+        "back-link": { en: "\u2190 Back to today\u2019s briefing", ku: "\u2190 Vegere nûçeyên îro" },
         "footer-home": { en: "Listen", ku: "Guhdarî" },
         "footer-about": { en: "About", ku: "Der barê" },
         "footer-sources": { en: "Sources", ku: "Çavkanî" },
