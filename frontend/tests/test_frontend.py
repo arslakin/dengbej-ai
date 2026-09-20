@@ -483,3 +483,56 @@ def test_returns_null_when_no_audio():
 def test_kurdish_url_used_even_if_available_false():
     result = _run_select('{available:true, url_ku:"ku.wav"}', "ku")
     assert result == "ku.wav"
+
+
+# ─── Contact page: "Report a correction" new-issue link + bilingual note ─────
+
+def test_contact_has_report_correction_new_issue_link():
+    """Contact must offer a direct, labelled link to the repo's new-issue page."""
+    html = _read(TRUST_PAGES["contact"])
+    assert 'href="https://github.com/arslakin/dengbej-ai/issues/new"' in html, \
+        "missing direct new-issue link"
+    assert 'id="link-report-correction"' in html, "report-correction link id missing"
+    # Link opens externally and safely.
+    m = re.search(r'<a href="https://github.com/arslakin/dengbej-ai/issues/new"[^>]*>', html)
+    assert m, "new-issue anchor not found"
+    anchor = m.group(0)
+    assert 'target="_blank"' in anchor, "new-issue link should open in a new tab"
+    assert "noopener" in anchor, "new-issue link missing rel=noopener"
+
+
+def test_contact_report_link_is_clearly_labelled_both_languages():
+    """The link label must be a clear 'report a correction' call in en and ku."""
+    js = _extract_script(_read(TRUST_PAGES["contact"]))
+    m = re.search(
+        r'"link-report-correction":\s*\{\s*en:\s*"(.*?)",\s*ku:\s*"(.*?)"\s*\}', js
+    )
+    assert m, "link-report-correction translation not found"
+    en_label, ku_label = m.group(1), m.group(2)
+    assert "correction" in en_label.lower(), "English label must mention correction"
+    assert en_label and ku_label and en_label != ku_label, \
+        "labels must be present and translated"
+
+
+def test_contact_discloses_github_signin_bilingually():
+    """Honest disclosure that GitHub may require sign-in, in en and ku."""
+    html = _read(TRUST_PAGES["contact"])
+    assert 'id="p-report-note"' in html, "sign-in disclosure element missing"
+    js = _extract_script(html)
+    m = re.search(
+        r'"p-report-note":\s*\{\s*en:\s*"(.*?)",\s*ku:\s*"(.*?)"\s*\}', js, re.DOTALL
+    )
+    assert m, "p-report-note translation not found"
+    en_note, ku_note = m.group(1), m.group(2)
+    assert "sign in" in en_note.lower(), "English note must disclose GitHub sign-in"
+    assert en_note and ku_note and en_note != ku_note, \
+        "sign-in note must be present and translated"
+
+
+def test_contact_report_link_makes_no_unsupported_promise():
+    """The correction flow must not invent an email or promise a response time."""
+    html = _read(TRUST_PAGES["contact"])
+    assert "mailto:" not in html
+    # No response-time / guarantee language around corrections.
+    for phrase in ["within 24 hours", "we will respond", "guaranteed", "response time"]:
+        assert phrase.lower() not in html.lower(), f"unsupported promise: {phrase}"
