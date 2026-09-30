@@ -616,3 +616,48 @@ def test_navigation_does_not_skip_empty_programs():
     body = m.group(1)
     # Must not gate stepping on programAvailability (which would skip empties).
     assert "programAvailability" not in body, "navigation still skips empty programs"
+
+
+# ─── Source-URL scheme hardening (production-readiness) ──────────────────────
+
+def _run_safe_url(url_literal):
+    """Execute the frontend safeUrl() helper via node with a given input."""
+    if NODE is None:
+        pytest.skip("node not available")
+    js = _extract_script(_read(INDEX_HTML))
+    m = re.search(r"function safeUrl\(url\) \{.*?\n      \}", js, re.DOTALL)
+    assert m, "safeUrl() not found"
+    harness = m.group(0) + "\nconsole.log(JSON.stringify(safeUrl(" + url_literal + ")));\n"
+    tmp = "/tmp/_dengbej_safeurl.js"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(harness)
+    result = subprocess.run([NODE, tmp], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    import json
+    return json.loads(result.stdout.strip())
+
+
+def test_safe_url_helper_exists_and_is_used_for_story_links():
+    """Story links must route the source URL through safeUrl() (scheme allow-list)."""
+    js = _extract_script(_read(INDEX_HTML))
+    assert "function safeUrl(url)" in js, "safeUrl helper missing"
+    # Both render paths must sanitize the primary source URL.
+    assert js.count("safeUrl(story.primary_source.url)") >= 2, \
+        "story links not consistently sanitized"
+
+
+@pytest.mark.skipif(NODE is None, reason="node not available")
+def test_safe_url_allows_http_and_https():
+    assert _run_safe_url('"https://bbc.co.uk/news/x"') == "https://bbc.co.uk/news/x"
+    assert _run_safe_url('"http://example.com/a"') == "http://example.com/a"
+
+
+@pytest.mark.skipif(NODE is None, reason="node not available")
+def test_safe_url_blocks_javascript_and_data_schemes():
+    """javascript:/data: URLs from untrusted feeds must be neutralized to empty."""
+    assert _run_safe_url('"javascript:alert(1)"') == ""
+    assert _run_safe_url('"JavaScript:alert(1)"') == ""
+    assert _run_safe_url('"data:text/html;base64,PHN2Zz4="') == ""
+    assert _run_safe_url("\"  javascript:alert(1)  \"") == ""
+    assert _run_safe_url("null") == ""
+    assert _run_safe_url('""') == ""

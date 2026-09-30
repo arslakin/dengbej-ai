@@ -474,6 +474,16 @@
         return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
       }
 
+      // Only allow http(s) links for source URLs. Story URLs come from external
+      // RSS feeds (untrusted), so a stored "javascript:" or "data:" scheme must
+      // never become a clickable href. Returns "" for anything unsafe.
+      function safeUrl(url) {
+        if (!url) return "";
+        var trimmed = String(url).trim();
+        if (/^https?:\/\//i.test(trimmed)) return trimmed;
+        return "";
+      }
+
       var categoryColors = {
         conflict: "var(--cat-conflict)", politics: "var(--cat-politics)",
         "human rights": "var(--cat-human-rights)", "human-rights": "var(--cat-human-rights)",
@@ -828,7 +838,7 @@
           var headline = currentLang === "ku" ? (story.headline_ku || story.headline || "") : (story.headline || "");
           var summary = currentLang === "ku" ? (story.summary_ku || story.summary_en || "") : (story.summary_en || "");
           var source = story.primary_source ? story.primary_source.name : "";
-          var sourceUrl = story.primary_source ? story.primary_source.url : "";
+          var sourceUrl = story.primary_source ? safeUrl(story.primary_source.url) : "";
           var storyId = "story-summary-" + i;
           html += '<article class="story">';
           html += '<div class="story-rank">' + rank + '</div>';
@@ -892,7 +902,7 @@
           var headline = currentLang === "ku" ? (story.headline_ku || story.headline || "") : (story.headline || "");
           var summary = currentLang === "ku" ? (story.summary_ku || story.feed_description || "") : (story.feed_description || story.summary_en || "");
           var source = story.primary_source ? story.primary_source.name : "";
-          var sourceUrl = story.primary_source ? story.primary_source.url : "";
+          var sourceUrl = story.primary_source ? safeUrl(story.primary_source.url) : "";
           var storyId = "prog-story-summary-" + i;
           html += '<article class="story">';
           html += '<div class="story-rank">' + rank + '</div>';
