@@ -393,3 +393,128 @@ if __name__ == "__main__":
     print(f"\nResults: {passed} passed, {failed} failed, {passed + failed} total")
     if failed > 0:
         sys.exit(1)
+
+
+# ─── Regional source-safety guards ───────────────────────────────────────────
+# These lock in the anti-substitution rules for the regional-news feature:
+#   - generic Turkey news must NOT be presented as Bakur (Kurdish) news
+#   - generic Iran news must NOT be presented as Rojhilat (Kurdish) news
+# and confirm that Rojava / Başûr / general behaviour remains intact.
+
+def test_guard_generic_turkey_tourism_not_bakur():
+    """A generic Turkey tourism story is Turkey, never Bakur."""
+    result = classify_story_deterministic(
+        headline="Turkey tourism revenue hits record as visitors flock to Antalya",
+        summary="Türkiye welcomed millions of tourists to its Mediterranean resorts this summer",
+        category="economy",
+    )
+    assert "turkey" in result.programs
+    assert "bakur" not in result.programs, f"generic Turkey tourism leaked into bakur: {result.programs}"
+    assert "kurdistan" not in result.programs
+
+
+def test_guard_generic_turkey_football_not_bakur():
+    """Turkish football coverage is Turkey (if the subject), never Bakur."""
+    result = classify_story_deterministic(
+        headline="Turkish football league opens new season in Istanbul",
+        summary="Ankara and Istanbul clubs prepare for the Süper Lig kickoff",
+        category="sport",
+    )
+    assert "bakur" not in result.programs, f"Turkish football leaked into bakur: {result.programs}"
+
+
+def test_guard_generic_iran_economy_not_rojhilat():
+    """A generic Iran economy story is not Rojhilat (Kurdish) news."""
+    result = classify_story_deterministic(
+        headline="Iran unveils new budget amid inflation concerns",
+        summary="Tehran's government presents its annual spending plan to parliament",
+        category="economy",
+    )
+    assert "rojhilat" not in result.programs, f"generic Iran economy leaked into rojhilat: {result.programs}"
+    assert "kurdistan" not in result.programs
+
+
+def test_guard_generic_iran_sport_not_rojhilat():
+    """Iranian sport coverage is not Rojhilat news."""
+    result = classify_story_deterministic(
+        headline="Iran national team qualifies for World Cup",
+        summary="Tehran celebrates as the football squad secures qualification",
+        category="sport",
+    )
+    assert "rojhilat" not in result.programs, f"Iran sport leaked into rojhilat: {result.programs}"
+
+
+def test_guard_being_from_turkey_alone_does_not_make_it_bakur():
+    """Country-of-origin (Turkey) is not sufficient for the Bakur (Kurdish) program."""
+    result = classify_story_deterministic(
+        headline="Istanbul stock exchange rallies on tech earnings",
+        summary="Turkish equities climbed after strong quarterly results",
+        category="economy",
+    )
+    assert "bakur" not in result.programs
+
+
+def test_guard_being_from_iran_alone_does_not_make_it_rojhilat():
+    """Country-of-origin (Iran) is not sufficient for the Rojhilat (Kurdish) program."""
+    result = classify_story_deterministic(
+        headline="Iran and Russia sign energy cooperation deal",
+        summary="Tehran and Moscow expand oil and gas ties",
+        category="economy",
+    )
+    assert "rojhilat" not in result.programs
+
+
+def test_guard_kurdish_turkey_story_still_reaches_bakur():
+    """A genuinely Kurdish-in-Turkey story must still classify as Bakur (no over-correction)."""
+    result = classify_story_deterministic(
+        headline="DEM Party wins mayoral seats in Diyarbakir",
+        summary="Kurdish-focused party gains ground in southeastern Turkey",
+        category="politics",
+    )
+    assert "bakur" in result.programs
+    assert "kurdistan" in result.programs
+
+
+def test_guard_kurdish_iran_story_still_reaches_rojhilat():
+    """A genuinely Kurdish-in-Iran story must still classify as Rojhilat (no over-correction)."""
+    result = classify_story_deterministic(
+        headline="Kurdish activists detained in Sanandaj",
+        summary="Rights groups report arrests of Iranian Kurds in Rojhilat",
+        category="human-rights",
+    )
+    assert "rojhilat" in result.programs
+    assert "kurdistan" in result.programs
+
+
+def test_guard_rojava_behaviour_intact():
+    """Rojava classification must remain intact for NE Syria Kurdish stories."""
+    result = classify_story_deterministic(
+        headline="Autonomous administration reopens schools in Qamishli",
+        summary="Northeast Syria council announces new academic year in Rojava",
+        category="education",
+    )
+    assert "rojava" in result.programs
+    assert "kurdistan" in result.programs
+
+
+def test_guard_basur_behaviour_intact():
+    """Başûr classification must remain intact for KRG/Iraqi-Kurdistan stories."""
+    result = classify_story_deterministic(
+        headline="KRG and Baghdad reach new budget agreement",
+        summary="Kurdistan Regional Government in Erbil settles revenue dispute",
+        category="politics",
+    )
+    assert "basur" in result.programs
+    assert "kurdistan" in result.programs
+
+
+def test_guard_general_world_behaviour_intact():
+    """General world news must remain in world and out of every Kurdish program."""
+    result = classify_story_deterministic(
+        headline="Global markets rally after central bank decision",
+        summary="Stocks rose worldwide following the announcement",
+        category="economy",
+    )
+    assert "world" in result.programs
+    for kurdish in ("bakur", "rojava", "basur", "rojhilat", "kurdistan"):
+        assert kurdish not in result.programs, f"world story leaked into {kurdish}"

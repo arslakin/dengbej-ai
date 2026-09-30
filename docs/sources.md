@@ -102,6 +102,15 @@ To add a new source:
 3. Document the source in this file with attribution requirements.
 4. Add an entry to `feeds_config.json` with `enabled: true`.
 
+### Candidate sources (not yet approved)
+
+Regional source ideas that are still being researched live in
+[`docs/regional_source_candidates.md`](regional_source_candidates.md). That file
+is a research backlog only — a publisher listed there is **not** approved for
+ingestion. A candidate may be promoted to `feeds_config.json` only after BOTH
+its RSS feed availability has been verified AND its reuse/republishing terms
+have been reviewed and approved by a human maintainer.
+
 ---
 
 ## Attribution Display (Future Frontend)

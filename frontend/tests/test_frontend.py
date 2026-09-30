@@ -536,3 +536,83 @@ def test_contact_report_link_makes_no_unsupported_promise():
     # No response-time / guarantee language around corrections.
     for phrase in ["within 24 hours", "we will respond", "guaranteed", "response time"]:
         assert phrase.lower() not in html.lower(), f"unsupported promise: {phrase}"
+
+
+# ─── Regional programs: empty programs stay selectable + empty state ─────────
+
+def _index_script():
+    return _extract_script(_read(INDEX_HTML))
+
+
+def test_program_buttons_are_never_disabled_when_empty():
+    """A program with zero stories must NOT be rendered disabled/unclickable.
+
+    Regression guard: previously empty programs (e.g. Bakur, Rojhilat) got
+    data-available="false" plus a `disabled` attribute and CSS
+    pointer-events:none, which made them unselectable. Selectability must be
+    decoupled from story presence.
+    """
+    js = _index_script()
+    # The button template must not inject a disabled attribute.
+    m = re.search(r"function renderPrograms\(\) \{(.*?)\n      \}", js, re.DOTALL)
+    assert m, "renderPrograms not found"
+    body = m.group(1)
+    assert "disabled" not in body, "program buttons must not be disabled"
+    assert 'data-available="' not in body, "old availability-disabling attribute present"
+    # The click handler must not early-return on a disabled button.
+    assert "if (btn.disabled) return" not in body, "click handler still gates on disabled"
+
+
+def test_program_btn_css_does_not_block_pointer_events():
+    """Empty-program styling must not disable pointer events or clicks."""
+    css = _extract_style(_read(INDEX_HTML))
+    # Grab all .program-btn rules and ensure none kill interactivity.
+    program_btn_rules = re.findall(r"\.program-btn[^\{]*\{[^\}]*\}", css)
+    assert program_btn_rules, "no .program-btn CSS rules found"
+    joined = " ".join(program_btn_rules)
+    assert "pointer-events: none" not in joined, "program buttons block pointer events"
+    assert "cursor: not-allowed" not in joined, "program buttons show not-allowed cursor"
+
+
+def test_bakur_and_rojhilat_are_defined_selectable_programs():
+    """Bakur and Rojhilat must exist in the program list so they can be selected."""
+    js = _index_script()
+    m = re.search(r"var PROGRAMS = \[(.*?)\];", js, re.DOTALL)
+    assert m, "PROGRAMS list not found"
+    programs_block = m.group(1)
+    assert 'id: "bakur"' in programs_block, "bakur program missing"
+    assert 'id: "rojhilat"' in programs_block, "rojhilat program missing"
+
+
+def test_empty_program_shows_no_current_stories_bilingual():
+    """Empty program view + today empty state must show 'No current stories' (EN) and a Kurdish equivalent."""
+    js = _index_script()
+    # English empty label present.
+    assert "No current stories" in js, "English empty state missing"
+    # Kurdish empty label present. The source stores Kurdish letters as JS
+    # \uXXXX escapes, so match the literal escape sequence (Niha çîrok nînin).
+    assert r"Niha \u00E7\u00EErok n\u00EEnin" in js, "Kurdish empty state missing"
+
+
+def test_empty_program_view_uses_empty_state_not_substitute_stories():
+    """The program view empty branch must render the empty state, never fabricate stories."""
+    js = _index_script()
+    m = re.search(r"function renderProgramView\(data, programId\) \{(.*?)\n      \}", js, re.DOTALL)
+    assert m, "renderProgramView not found"
+    body = m.group(1)
+    # Empty branch keyed on zero stories renders the radio-card-empty block.
+    assert "radio-card-empty" in body, "empty-state block missing in program view"
+    assert "storyCount === 0" in body, "empty-state condition missing"
+
+
+def test_navigation_does_not_skip_empty_programs():
+    """Prev/next navigation must reach empty programs, not skip them."""
+    js = _index_script()
+    m = re.search(
+        r"function findNextAvailableProgram\(startIdx, direction\) \{(.*?)\n      \}",
+        js, re.DOTALL,
+    )
+    assert m, "findNextAvailableProgram not found"
+    body = m.group(1)
+    # Must not gate stepping on programAvailability (which would skip empties).
+    assert "programAvailability" not in body, "navigation still skips empty programs"

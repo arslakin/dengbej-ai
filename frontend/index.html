@@ -96,7 +96,10 @@
     .program-btn:hover { border-color: var(--accent); color: var(--accent); }
     .program-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .program-btn[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .program-btn[data-available="false"] { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+    /* Programs with no current stories stay fully selectable; only a subtle
+       visual hint distinguishes them. Never disable or block pointer events. */
+    .program-btn[data-has-stories="false"] { opacity: 0.7; }
+    .program-btn[data-has-stories="false"][aria-checked="true"] { opacity: 1; }
     .beje-row { display: flex; align-items: center; gap: 1rem; }
     .beje-btn {
       font-family: Georgia, serif; font-size: 1.1rem; font-weight: 700;
@@ -619,31 +622,27 @@
       }
 
       // ── Programs ──
+      // Every defined program is always selectable. Story presence
+      // (programAvailability[id] === false means "zero current stories")
+      // controls only an "empty" hint, never clickability — an empty
+      // regional program like Bakur or Rojhilat must remain selectable so
+      // listeners can open it and see the "No current stories" empty state.
       function renderPrograms() {
         var html = "";
         PROGRAMS.forEach(function(prog) {
           var label = currentLang === "ku" ? prog.label_ku : prog.label_en;
           var selected = prog.id === selectedProgram;
-          var available = programAvailability[prog.id] !== false;
-          var disabledAttr = available ? "" : " disabled aria-disabled=\"true\"";
-          html += '<button type="button" class="program-btn" role="radio" aria-checked="' + selected + '" data-program="' + prog.id + '" data-available="' + available + '"' + disabledAttr + '>' + escapeHtml(label) + '</button>';
+          var hasStories = programAvailability[prog.id] !== false;
+          html += '<button type="button" class="program-btn" role="radio" aria-checked="' + selected + '" data-program="' + prog.id + '" data-has-stories="' + hasStories + '">' + escapeHtml(label) + '</button>';
         });
         programChoices.innerHTML = html;
         programChoices.querySelectorAll(".program-btn").forEach(function(btn) {
           btn.addEventListener("click", function() {
-            if (btn.disabled) return;
             selectedProgram = btn.getAttribute("data-program");
             renderPrograms();
             updateBejeButton();
           });
         });
-
-        // If currently selected program became unavailable, fall back to "today"
-        if (programAvailability[selectedProgram] === false && selectedProgram !== "today") {
-          selectedProgram = "today";
-          renderPrograms();
-          updateBejeButton();
-        }
       }
 
       // Shared audio status text. isKurdish = the URL that will play is Kurmanji.
@@ -724,9 +723,7 @@
       }
 
       function showEmpty() {
-        var msg = currentLang === "ku"
-          ? "Di n\u00FB\u00E7ey\u00EAn niha de t\u00EA de nîne ku ji v\u00EA bernam\u00EAy\u00EA re guncan be. Bernameyeke din hilbij\u00EAre."
-          : "No relevant stories match this program in the current news cycle. Try another program.";
+        var msg = currentLang === "ku" ? "Niha \u00E7\u00EErok n\u00EEnin" : "No current stories";
         storiesContainer.innerHTML = '<div class="state-container"><p>' + escapeHtml(msg) + '</p></div>';
       }
 
@@ -863,11 +860,10 @@
         var html = '<div class="radio-card">';
 
         if (storyCount === 0 && stories.length === 0) {
+          // Empty program: keep it open and selectable, show a clear empty state.
           html += '<div class="radio-card-empty">';
-          html += '<p class="empty-ku">Niha n\u00FB\u00E7ey\u00EAn v\u00EA bernam\u00EAy\u00EA n\u00EEn in.</p>';
-          html += '<p>' + (currentLang === "ku"
-            ? "Di n\u00FB\u00E7ey\u00EAn niha de t\u00EA de nîne ku ji v\u00EA bernam\u00EAy\u00EA re guncan be. Bernameyeke din hilbij\u00EAre."
-            : "No relevant stories match this program in the current news cycle. Try another program.") + '</p>';
+          html += '<p class="empty-ku">Niha \u00E7\u00EErok n\u00EEnin</p>';
+          html += '<p>' + (currentLang === "ku" ? "Niha \u00E7\u00EErok n\u00EEnin" : "No current stories") + '</p>';
           html += '</div>';
         } else {
           html += '<div class="radio-card-header">';
@@ -996,12 +992,11 @@
         }
       }
 
+      // All programs are selectable, so navigation simply steps to the next
+      // program in range regardless of current story count.
       function findNextAvailableProgram(startIdx, direction) {
         var i = startIdx + direction;
-        while (i >= 0 && i < PROGRAMS.length) {
-          if (programAvailability[PROGRAMS[i].id] !== false) return i;
-          i += direction;
-        }
+        if (i >= 0 && i < PROGRAMS.length) return i;
         return -1;
       }
 
