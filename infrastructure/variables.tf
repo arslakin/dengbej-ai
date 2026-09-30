@@ -107,3 +107,38 @@ variable "events_table_name" {
   type        = string
   default     = "dengbej-events"
 }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Production Hardening — Phase 1 feature flags (PLAN-ONLY)
+#
+# Every hardening resource below is DISABLED by default (flag = false ->
+# count = 0). With all flags false, `terraform plan` adds/changes/destroys
+# NOTHING. Each item is enabled deliberately, one small reviewed apply at a
+# time, per the SAFE APPLY SEQUENCE in docs/production_infrastructure_plan.md.
+#
+# Nothing here modifies an existing resource; these are all additive.
+# ─────────────────────────────────────────────────────────────────────────────
+
+variable "enable_s3_audio_lifecycle" {
+  description = "Phase 1: enable an S3 lifecycle rule that transitions old audio to cheaper storage (transition only; NO expiry/delete)."
+  type        = bool
+  default     = false
+}
+
+variable "s3_audio_transition_days" {
+  description = "Days before audio objects transition to STANDARD_IA (no expiry/delete configured)."
+  type        = number
+  default     = 90
+}
+
+variable "manage_least_privilege_legacy_role" {
+  description = "Phase 1: create a scoped Bedrock/Polly inline policy for the legacy summary role (to replace the Full-access managed policies in the same reviewed apply). Enable only after confirming the legacy Lambda's real usage."
+  type        = bool
+  default     = false
+}
+
+# NOTE: DynamoDB TTL on the articles table and a pub_date GSI are also Phase 1
+# proposals, but they are IN-PLACE edits to the existing table block rather than
+# standalone resources. They are specified in docs/production_infrastructure_plan.md
+# and are applied by editing news_ingestion.tf in their own reviewed apply, not
+# via a feature flag here (to avoid any chance of a table-diff while disabled).
