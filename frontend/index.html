@@ -306,6 +306,34 @@
     }
     @media (min-width: 600px) and (max-width: 899px) { .container { padding: 0 2rem; } }
     @media (min-width: 900px) { .story-headline { font-size: 1.6rem; } header { padding: 2rem 0 1.5rem; } }
+
+    /* ── Desktop listening area (>=1100px) ──
+       Bounded desktop-only enhancement: widen the main listening column and
+       lay the story list out as a two-column reading grid. The lead story and
+       all state containers (loading / error / empty) span the full grid width.
+       Header, footer, about, player, and all behavior are unchanged. Mobile
+       and tablet layouts above are untouched. */
+    @media (min-width: 1100px) {
+      #main-content.container { max-width: 1040px; }
+
+      /* The story list becomes a 2-column grid. renderStories and
+         renderProgramView append .story / .radio-card / .state-container as
+         direct children of #stories-container, so these grid rules apply with
+         no markup or JS change. */
+      #stories-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 2.5rem;
+        align-items: start;
+      }
+      /* Lead story spans both columns (full width). */
+      #stories-container > .story:first-child { grid-column: 1 / -1; }
+      /* Program view: the radio card header spans the full width. */
+      #stories-container > .radio-card { grid-column: 1 / -1; }
+      /* Loading / error / empty states span the full grid width. */
+      #stories-container > .state-container { grid-column: 1 / -1; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .loading-dots::after { animation: none; content: '...'; }
       *, *::before, *::after { transition: none !important; animation: none !important; }

@@ -661,3 +661,86 @@ def test_safe_url_blocks_javascript_and_data_schemes():
     assert _run_safe_url("\"  javascript:alert(1)  \"") == ""
     assert _run_safe_url("null") == ""
     assert _run_safe_url('""') == ""
+
+
+# ─── Desktop listening layout (>=1100px) ────────────────────────────────────
+# Bounded desktop-only enhancement: at >=1100px the story list becomes a
+# two-column reading grid with a full-width lead story and full-width state
+# containers. Mobile/tablet layouts and all behavior must be preserved.
+
+def _desktop_media_block():
+    """Return the CSS text inside the @media (min-width: 1100px) block."""
+    css = _extract_style(_read(INDEX_HTML))
+    idx = css.find("@media (min-width: 1100px)")
+    assert idx != -1, "desktop (>=1100px) media query missing"
+    # Walk braces to capture the full block body.
+    brace_start = css.index("{", idx)
+    depth = 0
+    for i in range(brace_start, len(css)):
+        if css[i] == "{":
+            depth += 1
+        elif css[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return css[brace_start + 1:i]
+    raise AssertionError("unterminated desktop media block")
+
+
+def test_desktop_breakpoint_exists_at_1100px():
+    css = _extract_style(_read(INDEX_HTML))
+    assert "@media (min-width: 1100px)" in css, "desktop breakpoint must be >=1100px"
+
+
+def test_desktop_widens_main_listening_area():
+    block = _desktop_media_block()
+    assert "#main-content.container" in block, "desktop should widen the main content container"
+    assert "max-width" in block, "desktop main content should set a wider max-width"
+
+
+def test_desktop_stories_container_is_two_column_grid():
+    block = _desktop_media_block()
+    assert "#stories-container" in block
+    assert "display: grid" in block, "stories container must be a grid on desktop"
+    assert "grid-template-columns: 1fr 1fr" in block, "stories grid must be two columns"
+
+
+def test_desktop_lead_story_spans_full_width():
+    block = _desktop_media_block()
+    assert "#stories-container > .story:first-child" in block, "lead story rule missing"
+    # The lead story and other full-width elements use grid-column: 1 / -1.
+    assert "grid-column: 1 / -1" in block, "lead story must span the full grid width"
+
+
+def test_desktop_state_containers_span_full_grid():
+    block = _desktop_media_block()
+    assert "#stories-container > .state-container" in block, \
+        "loading/error/empty state containers must span the grid on desktop"
+
+
+def test_desktop_program_card_spans_full_grid():
+    block = _desktop_media_block()
+    assert "#stories-container > .radio-card" in block, \
+        "program radio-card must span the full grid width on desktop"
+
+
+def test_mobile_and_tablet_breakpoints_preserved():
+    """The desktop change must not remove existing mobile/tablet breakpoints."""
+    css = _extract_style(_read(INDEX_HTML))
+    assert "@media (max-width: 599px)" in css, "mobile breakpoint lost"
+    assert "@media (min-width: 600px) and (max-width: 899px)" in css, "tablet breakpoint lost"
+    assert "@media (min-width: 900px)" in css, "900px breakpoint lost"
+    assert "@media (prefers-reduced-motion: reduce)" in css, "reduced-motion block lost"
+
+
+def test_desktop_change_does_not_alter_core_behavior_hooks():
+    """Behavior-critical IDs/handlers remain present (no JS/markup regression)."""
+    html = _read(INDEX_HTML)
+    js = _extract_script(html)
+    # Listening experience + player + bilingual + audio selection still wired.
+    assert 'id="beje-btn"' in html
+    assert 'id="stories-container"' in html
+    assert 'id="main-content"' in html
+    assert 'id="btn-en"' in html and 'id="btn-ku"' in html
+    assert "function selectAudioUrl(audioMeta)" in js
+    assert "function renderStories(data)" in js
+    assert "function renderProgramView(data, programId)" in js
