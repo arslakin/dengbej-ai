@@ -33,7 +33,29 @@ class DecimalEncoder(json.JSONEncoder):
 
 
 def lambda_handler(event, context):
-    """Route requests to appropriate handler."""
+    """Top-level entry point with a failure boundary.
+
+    Any unexpected error (including DynamoDB ClientError that reaches here)
+    returns a controlled, generic JSON 500 through cors_response. The client
+    never receives exception messages, stack traces, table names, AWS
+    identifiers, or credentials. Server-side logs record enough context to
+    diagnose, without logging secrets.
+    """
+    try:
+        return _route_request(event, context)
+    except Exception as e:  # noqa: BLE001 — deliberate catch-all boundary
+        # Log the type and a short, non-sensitive message server-side only.
+        # The event/body are NOT logged to avoid leaking anything sensitive.
+        try:
+            path = event.get("rawPath", event.get("path", "/")) if isinstance(event, dict) else "<non-dict event>"
+        except Exception:
+            path = "<unknown>"
+        print(f"Unhandled error in news_api for path={path}: {type(e).__name__}: {str(e)[:200]}")
+        return cors_response(500, {"error": "Internal server error"})
+
+
+def _route_request(event, context):
+    """Route requests to the appropriate handler."""
     path = event.get("rawPath", event.get("path", "/"))
     method = event.get("requestContext", {}).get("http", {}).get("method", "GET")
 
@@ -85,23 +107,25 @@ def handle_date(date_str):
 
 
 def handle_program(program_id):
-    """Return latest program briefing."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    """Return latest program briefing.
 
-    # Try today, then yesterday, then up to 7 days back
+    A DynamoDB failure must NOT be presented as a successful empty program.
+    ClientError is allowed to propagate to the top-level failure boundary,
+    which returns a controlled 500. Only a clean lookup that finds no
+    stories across the window returns the honest empty 200 below.
+    """
+    # Try today, then yesterday, then up to 7 days back.
+    # (A ClientError here propagates to lambda_handler -> controlled 500.)
     for days_back in range(8):
         date = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
-        try:
-            response = programs_table_resource.get_item(
-                Key={"program_id": program_id, "briefing_date": date}
-            )
-            item = response.get("Item")
-            if item and item.get("story_count", 0) > 0:
-                return cors_response(200, format_program(item))
-        except ClientError:
-            pass
+        response = programs_table_resource.get_item(
+            Key={"program_id": program_id, "briefing_date": date}
+        )
+        item = response.get("Item")
+        if item and item.get("story_count", 0) > 0:
+            return cors_response(200, format_program(item))
 
-    # Return empty program
+    # No stories found across the window — honest empty program (valid 200).
     return cors_response(200, {
         "program_id": program_id,
         "label_ku": "",
@@ -153,27 +177,30 @@ def format_program(item):
 
 
 def get_processed_briefing(date_str):
-    """Query DynamoDB for the latest briefing on this date with processed stories."""
-    try:
-        response = briefings_table.query(
-            KeyConditionExpression="briefing_date = :bd",
-            ExpressionAttributeValues={":bd": date_str},
-            ScanIndexForward=False,
-            Limit=5,
-        )
-        items = response.get("Items", [])
+    """Query DynamoDB for the latest briefing on this date with processed stories.
 
-        # Find the most recent briefing that has at least one processed story
-        for item in items:
-            stories = item.get("stories", [])
-            processed = [s for s in stories if s.get("processing_status") == "processed"]
-            if processed:
-                return item
+    Returns None only when the query succeeds but no processed briefing exists
+    for the date (a legitimate "not found" -> 404 upstream). A DynamoDB
+    ClientError is NOT swallowed here: it propagates to the top-level failure
+    boundary so a data-store outage becomes a controlled 500 rather than a
+    misleading 404 "no briefing available".
+    """
+    response = briefings_table.query(
+        KeyConditionExpression="briefing_date = :bd",
+        ExpressionAttributeValues={":bd": date_str},
+        ScanIndexForward=False,
+        Limit=5,
+    )
+    items = response.get("Items", [])
 
-        return None
-    except ClientError as e:
-        print(f"DynamoDB error: {e}")
-        return None
+    # Find the most recent briefing that has at least one processed story
+    for item in items:
+        stories = item.get("stories", [])
+        processed = [s for s in stories if s.get("processing_status") == "processed"]
+        if processed:
+            return item
+
+    return None
 
 
 def format_briefing(briefing):

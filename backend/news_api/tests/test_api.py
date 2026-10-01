@@ -494,3 +494,102 @@ def test_daily_audio_date_matches_briefing_record():
 
     body = json.loads(response["body"])
     assert body["date"] == "2026-08-28"
+
+
+# ─── Tests: API failure safety (production-readiness) ────────────────────────
+# 1) Top-level exception boundary -> controlled JSON 500 (no leaks).
+# 2) DynamoDB ClientError must NOT be presented as a successful empty 200.
+#    A genuine zero-story program still returns its honest empty 200.
+
+from botocore.exceptions import ClientError as _ClientError
+
+_DDB_ERROR = _ClientError(
+    {"Error": {"Code": "InternalServerError",
+               "Message": "secret-table-name dengbej-briefings arn:aws:... leaked detail"}},
+    "Query",
+)
+
+
+def test_normal_routing_unchanged_today_200():
+    """A valid /news/today with a processed briefing still returns 200."""
+    stories = [_make_story(1), _make_story(2)]
+    briefing = _make_briefing("2026-01-15", stories)
+    with patch("lambda_function.briefings_table") as mock_table:
+        mock_table.query.return_value = {"Items": [briefing]}
+        response = _invoke_lambda("/news/today")
+    assert response["statusCode"] == 200
+    body = json.loads(response["body"])
+    assert body["story_count"] == 2
+
+
+def test_unexpected_exception_returns_controlled_json_500():
+    """An unexpected error in routing returns a generic JSON 500, no leak."""
+    with patch("lambda_function.briefings_table") as mock_table:
+        mock_table.query.side_effect = RuntimeError("boom: internal detail /secret/path token=abc123")
+        response = _invoke_lambda("/news/today")
+    assert response["statusCode"] == 500
+    body = json.loads(response["body"])
+    # Generic message only — no exception text, path, or secrets.
+    assert body == {"error": "Internal server error"}
+    assert "boom" not in response["body"]
+    assert "token" not in response["body"]
+    assert "secret" not in response["body"].lower()
+
+
+def test_dynamodb_clienterror_on_today_is_500_not_404():
+    """A DynamoDB failure on /news/today becomes a controlled 500, not a 404."""
+    with patch("lambda_function.briefings_table") as mock_table:
+        mock_table.query.side_effect = _DDB_ERROR
+        response = _invoke_lambda("/news/today")
+    assert response["statusCode"] == 500
+    body = json.loads(response["body"])
+    assert body == {"error": "Internal server error"}
+    # The DynamoDB error detail / table name must not leak to the client.
+    assert "dengbej-briefings" not in response["body"]
+    assert "arn:aws" not in response["body"]
+
+
+def test_dynamodb_clienterror_on_program_is_not_empty_200():
+    """A DynamoDB failure on a program must not masquerade as an empty 200."""
+    with patch("lambda_function.programs_table_resource") as mock_table:
+        mock_table.get_item.side_effect = _DDB_ERROR
+        response = _invoke_lambda("/news/program/bakur")
+    assert response["statusCode"] == 500, "DynamoDB failure must reach the 5xx path"
+    body = json.loads(response["body"])
+    assert body == {"error": "Internal server error"}
+    assert "story_count" not in body, "a DB failure must not look like a valid empty program"
+
+
+def test_genuine_zero_story_program_still_returns_empty_200():
+    """A valid program with no stories returns the honest empty 200 response."""
+    with patch("lambda_function.programs_table_resource") as mock_table:
+        # Clean lookups that simply find nothing across the 7-day window.
+        mock_table.get_item.return_value = {}
+        response = _invoke_lambda("/news/program/rojhilat")
+    assert response["statusCode"] == 200
+    body = json.loads(response["body"])
+    assert body["program_id"] == "rojhilat"
+    assert body["story_count"] == 0
+    assert body["stories"] == []
+    assert "message" in body
+
+
+def test_cors_headers_present_on_500():
+    """The controlled 500 preserves the standard response headers."""
+    with patch("lambda_function.briefings_table") as mock_table:
+        mock_table.query.side_effect = RuntimeError("x")
+        response = _invoke_lambda("/news/today")
+    assert response["statusCode"] == 500
+    headers = response["headers"]
+    assert headers["Content-Type"] == "application/json"
+    assert "Cache-Control" in headers
+
+
+def test_cors_headers_present_on_empty_program_200():
+    """CORS/response headers remain present on the empty-program 200."""
+    with patch("lambda_function.programs_table_resource") as mock_table:
+        mock_table.get_item.return_value = {}
+        response = _invoke_lambda("/news/program/bakur")
+    headers = response["headers"]
+    assert headers["Content-Type"] == "application/json"
+    assert "Cache-Control" in headers
