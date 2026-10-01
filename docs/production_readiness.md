@@ -14,6 +14,79 @@ Legend:
 
 ---
 
+## Release-candidate status — `release/public-product-v1`
+
+Branch `release/public-product-v1` is based on `feature/production-readiness`
+(`73a535a`) and adds the two completed production-readiness code changes below.
+This is a **reviewable release candidate only**: no deployment, no AWS change,
+no TTS usage occurred.
+
+### Completed in this release candidate (with test evidence)
+
+- **Desktop listener layout (DONE)** — a bounded, desktop-only CSS enhancement
+  in `frontend/index.html`: at viewport widths ≥ 1100px the listening column
+  widens and the story list becomes a two-column reading grid, with the lead
+  story full width and the program card plus all loading/error/empty state
+  containers spanning the full grid. Mobile (<599px), tablet (600–899px), the
+  900px rule, reduced-motion, bilingual switching, source links, Bêje!/Tell me!,
+  player controls, and audio selection are all preserved (CSS-only; no markup or
+  JS change). *Evidence:* 8 focused tests in `frontend/tests/test_frontend.py`
+  (desktop breakpoint, two-column grid, full-width lead/state/card, and guards
+  that mobile/tablet breakpoints and core behavior hooks remain). Frontend suite
+  **126 passed**.
+
+- **News API failure safety (DONE)** — both previously-deferred fixes in
+  `backend/news_api/lambda_function.py` are now implemented:
+  1. A **top-level exception boundary** wraps routing and returns a generic JSON
+     HTTP 500 (`{"error": "Internal server error"}`) on any unexpected failure.
+     No exception text, stack trace, table name, AWS identifier, or credential
+     is exposed to the client; only a short, non-sensitive context line is
+     logged server-side. Existing CORS and response format are unchanged.
+  2. **DynamoDB `ClientError` is no longer presented as a successful empty
+     program.** `handle_program` and `get_processed_briefing` no longer swallow
+     `ClientError`; a data-store failure now reaches the controlled 5xx path,
+     while a genuinely valid zero-story program still returns its honest empty
+     200 and existing 200/404 behavior is preserved.
+  *Evidence:* 8 focused tests in `backend/news_api/tests/test_api.py` (normal
+  routing unchanged; unexpected exception → controlled JSON 500 with no leak;
+  DynamoDB `ClientError` → 500 not empty 200; genuine zero-story program → valid
+  empty 200; CORS headers present on both the 500 and the empty-200). news_api
+  suite **30 passed**. These two items supersede the matching entries under
+  *NEEDS WORK BEFORE DEPLOYMENT* and *Deferred* below (now resolved).
+
+### Explicit gates that remain open (human / AWS — NOT done in this release)
+
+- **Source licensing review** — confirm BBC / DW / Al Jazeera attribution and
+  reuse compliance (metadata-only, link to original, no full-text republish).
+- **Acceptance of the public unauthenticated API** — a human must accept the
+  risk of the public, unauthenticated, unthrottled read API.
+- **Custom domain / CDN decision** — decide whether to keep the hardcoded Lambda
+  Function URL or move the site behind a stable custom domain / CDN.
+- **Terraform state reconciliation** — a real backend/state must be configured
+  before any infrastructure apply (see `docs/production_infrastructure_plan.md`;
+  with no state a plan shows every resource as "to create").
+- **Infrastructure apply & deployment approval** — IAM least-privilege, S3/
+  CloudFront, TTL/lifecycle, and the actual deploy all require explicit human
+  approval and are out of scope for this release candidate.
+
+### Explicit confirmations for this release candidate
+
+- **No deployment occurred** (not to Amplify, AWS, or anywhere).
+- **No new regional publisher was added** — `feeds_config.json` still contains
+  only the approved publishers (BBC, DW, Al Jazeera); no candidate was promoted.
+- **Kurdish TTS scheduling remains disabled** — `KURDISH_TTS_ENABLED` default
+  `false`; no EventBridge schedule invokes the Kurdish batch; batch path remains
+  `dry_run`-by-default and fail-closed.
+- **No TTS quota was consumed** — no Kurdish audio was generated.
+- **No ads, tracking/analytics, subscriptions, authentication, podcast
+  publishing, or ten-story expansion** were added. The release stays
+  privacy-respecting and free of advertising/tracking.
+- **No `terraform apply`, no production Lambda invocation, no AWS mutation.**
+- `feature/production-infra-hardening` was **not** merged into this release
+  branch; its Terraform plan stays separate until state is reconciled.
+
+---
+
 ## Summary of changes made in this phase
 
 - **Fixed (frontend, in-scope):** source-article links now pass through a new
@@ -61,15 +134,14 @@ Legend:
 
 ## NEEDS WORK BEFORE DEPLOYMENT
 
-- **API has no top-level error handler** — `news_api/lambda_function.py`
-  `lambda_handler` has no outer try/except; an unexpected error surfaces as a
-  raw Lambda error instead of a controlled JSON response. Recommend wrapping the
-  handler and returning a 500 JSON body. *(Code change, safe; deferred to keep
-  this phase's diff focused on the verified user-visible fix — see Deferred.)*
-- **DynamoDB errors masked as "empty"** — `handle_program` swallows `ClientError`
-  and returns an empty 200 program, so a transient outage looks like "no
-  stories." Consider distinguishing a data-store error (5xx) from a genuinely
-  empty program. *(Code change; deferred.)*
+- **API top-level error handler — RESOLVED in `release/public-product-v1`.**
+  `news_api/lambda_function.py` now wraps routing in a top-level exception
+  boundary returning a generic JSON 500 (no leaks). See the release-candidate
+  status section above. Verified by tests.
+- **DynamoDB errors masked as "empty" — RESOLVED in `release/public-product-v1`.**
+  `handle_program`/`get_processed_briefing` no longer swallow `ClientError`; a
+  data-store failure now reaches the controlled 5xx path while a genuine
+  zero-story program still returns its honest empty 200. Verified by tests.
 
 ---
 
@@ -179,14 +251,13 @@ counts documented as AWS-side improvements. No code changed.
 
 ---
 
-## Deferred (documented, not implemented this phase)
+## Deferred (follow-up)
 
-To keep this phase's change focused on the one verified user-visible security
-fix, the following safe *code* improvements were identified but deferred to a
-follow-up (they are low-risk but broaden the diff and warrant their own review):
+Items 1 and 2 below were **completed in `release/public-product-v1`** (see the
+release-candidate status section). The remaining items are still deferred:
 
-1. Add a top-level try/except in `news_api` returning a 500 JSON body.
-2. Distinguish DynamoDB errors from empty results in `handle_program`.
+1. ~~Add a top-level try/except in `news_api` returning a 500 JSON body.~~ **DONE.**
+2. ~~Distinguish DynamoDB errors from empty results in `handle_program`.~~ **DONE.**
 3. Pin/lock backend dependencies.
 4. Remove the dead `tts_provider.get_tts_provider()` path.
 
