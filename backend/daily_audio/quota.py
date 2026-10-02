@@ -75,25 +75,44 @@ def reserve(chars: int, month_key: str = None) -> bool:
 
     Uses a conditional update to prevent exceeding the limit even
     under concurrent invocations. Returns True if reservation succeeded.
+
+    The condition is expressed on the largest permitted *previous* value
+    rather than on the post-increment total, because ``if_not_exists()`` is
+    only valid inside an ``UpdateExpression`` — not inside a
+    ``ConditionExpression`` (using it there raises a DynamoDB
+    ``ValidationException``). The increment itself still uses
+    ``if_not_exists`` in the ``UpdateExpression`` so a missing record is
+    treated as a starting value of zero.
     """
     if chars <= 0:
         return True
     if month_key is None:
         month_key = get_current_month_key()
 
+    # A single request larger than the whole monthly budget can never fit.
+    # Reject it without touching DynamoDB (max_before would be negative).
+    if chars > MONTHLY_BUDGET:
+        return False
+
+    # Largest existing chars_used that still leaves room for this request:
+    #   previous + chars <= MONTHLY_BUDGET  <=>  previous <= MONTHLY_BUDGET - chars
+    max_before = MONTHLY_BUDGET - chars
+
     table = _get_table()
 
     try:
-        # Try to create the record or increment if it exists, but only if
-        # the resulting total would not exceed the budget.
+        # Create the record or increment it, but only if the current value is
+        # absent (new month) or small enough that adding `chars` stays within
+        # budget. This is concurrency-safe: a racing writer that already pushed
+        # chars_used above max_before makes the condition fail.
         table.update_item(
             Key={"program_id": QUOTA_PARTITION_KEY, "briefing_date": month_key},
             UpdateExpression="SET chars_used = if_not_exists(chars_used, :zero) + :inc, updated_at = :now",
-            ConditionExpression="if_not_exists(chars_used, :zero) + :inc <= :limit",
+            ConditionExpression="attribute_not_exists(chars_used) OR chars_used <= :max_before",
             ExpressionAttributeValues={
                 ":inc": Decimal(str(chars)),
                 ":zero": Decimal("0"),
-                ":limit": Decimal(str(MONTHLY_BUDGET)),
+                ":max_before": Decimal(str(max_before)),
                 ":now": datetime.now(timezone.utc).isoformat(),
             },
         )
