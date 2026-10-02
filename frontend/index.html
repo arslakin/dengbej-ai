@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#7a3b10">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/dengbej-192.png">
   <title>Dengbêj — News Worth Hearing</title>
   <meta name="description" content="A daily briefing of important global stories, summarized in English and Kurdish Kurmanji.">
   <meta property="og:title" content="Dengbêj — News Worth Hearing">
@@ -833,7 +836,17 @@
       }
 
       function showError() {
-        var msg = currentLang === "ku" ? "Niha peyda n\u00EEne. Ji kerema xwe d\u00EEsa bicerib\u00EEne." : "Temporarily unavailable. Please try again.";
+        var isOffline = navigator.onLine === false;
+        var msg;
+        if (isOffline) {
+          msg = currentLang === "ku"
+            ? "Tu niha b\u00EA \u00EEnternet \u00EE. N\u00FB\u00E7ey\u00EAn niha nay\u00EAn peydakirin."
+            : "You are offline. Current stories are unavailable without an internet connection.";
+        } else {
+          msg = currentLang === "ku"
+            ? "Niha peyda n\u00EEne. Ji kerema xwe d\u00EEsa bicerib\u00EEne."
+            : "Temporarily unavailable. Please try again.";
+        }
         var retryLabel = currentLang === "ku" ? "D\u00EEsa bicerib\u00EEne" : "Retry";
         storiesContainer.innerHTML = '<div class="state-container"><p>' + escapeHtml(msg) + '</p><button class="retry-btn" id="retry-btn">' + escapeHtml(retryLabel) + '</button></div>';
         document.getElementById("retry-btn").addEventListener("click", function() {
@@ -1172,7 +1185,20 @@
       btnEn.addEventListener("click", function() { setLanguage("en"); });
       btnKu.addEventListener("click", function() { setLanguage("ku"); });
 
+      // Register after the page has loaded. Registration is feature-detected
+      // and failure is deliberately non-fatal: the normal website must always
+      // remain usable when service workers are unsupported or registration fails.
+      function registerServiceWorker() {
+        if (!("serviceWorker" in navigator)) return;
+        window.addEventListener("load", function() {
+          navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(function() {
+            // Progressive enhancement only — never block the website.
+          });
+        });
+      }
+
       // ── Init ──
+      registerServiceWorker();
       setLanguage(currentLang);
       loadToday(function() {
         probeAvailability();

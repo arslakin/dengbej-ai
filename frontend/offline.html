@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ku">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#7a3b10">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/dengbej-192.png">
+  <title>Offline · Dengbêj</title>
+  <meta name="description" content="Dengbêj AI is offline. Current stories and audio require an internet connection.">
+  <style>
+    :root { --text: #111; --secondary: #444; --bg: #faf9f7; --accent: #7a3b10; --border: #e5e0d8; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      min-height: 100vh; margin: 0; padding: 1.5rem;
+      display: grid; place-items: center;
+      font-family: Georgia, 'Times New Roman', serif;
+      color: var(--text); background: var(--bg); line-height: 1.7;
+    }
+    main { width: min(100%, 34rem); text-align: center; }
+    .wordmark {
+      margin: 0 0 2rem; font-family: system-ui, sans-serif; font-size: 1.3rem;
+      font-weight: 700; letter-spacing: 0.18em;
+    }
+    h1 { margin: 0 0 0.75rem; font-size: 1.65rem; }
+    p { margin: 0 auto 1rem; color: var(--secondary); }
+    .retry {
+      display: inline-flex; min-height: 44px; align-items: center; margin-top: 0.75rem;
+      padding: 0.6rem 1.2rem; border-radius: 6px; color: #fff;
+      background: var(--accent); text-decoration: none; font-family: system-ui, sans-serif;
+      font-weight: 600;
+    }
+    .retry:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="wordmark">DENGBÊJ</p>
+    <h1>Tu niha bê înternet î</h1>
+    <p>Çîrok û dengê niha bê girêdana înternetê nayên peydakirin.</p>
+    <h1 lang="en">You’re offline</h1>
+    <p lang="en">Current stories and audio are unavailable without an internet connection. Cached news is not shown as current.</p>
+    <a class="retry" href="/">Dîsa biceribîne · Try again</a>
+  </main>
+</body>
+</html>

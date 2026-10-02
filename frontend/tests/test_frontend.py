@@ -827,3 +827,117 @@ def test_mobile_reduced_motion_and_regional_empty_state_preserved():
     assert "No current stories" in js
     assert r"Niha \u00E7\u00EErok n\u00EEnin" in js
     assert "if (btn.disabled) return" not in js
+
+
+# ─── PWA foundation ─────────────────────────────────────────────────────────
+
+MANIFEST = os.path.join(FRONTEND_DIR, "manifest.webmanifest")
+SERVICE_WORKER = os.path.join(FRONTEND_DIR, "sw.js")
+OFFLINE_HTML = os.path.join(FRONTEND_DIR, "offline.html")
+
+
+def test_manifest_has_required_installable_fields():
+    import json
+    manifest = json.loads(_read(MANIFEST))
+    assert manifest["name"] == "Dengbêj AI"
+    assert manifest["short_name"] == "Dengbêj"
+    assert manifest["start_url"] == "/"
+    assert manifest["scope"] == "/"
+    assert manifest["display"] == "standalone"
+    assert manifest["theme_color"] == "#7a3b10"
+    assert manifest["background_color"] == "#faf9f7"
+    assert manifest["prefer_related_applications"] is False
+    assert manifest["lang"] == "ku"
+
+
+def test_manifest_declares_exact_192_and_512_png_icons():
+    import json
+    manifest = json.loads(_read(MANIFEST))
+    icons = {icon["sizes"]: icon for icon in manifest["icons"]}
+    assert set(icons) == {"192x192", "512x512"}
+    assert icons["192x192"]["src"] == "/icons/dengbej-192.png"
+    assert icons["512x512"]["src"] == "/icons/dengbej-512.png"
+    assert all(icon["type"] == "image/png" for icon in icons.values())
+
+
+def _png_dimensions(path):
+    import struct
+    with open(path, "rb") as image:
+        header = image.read(24)
+    assert header[:8] == b"\x89PNG\r\n\x1a\n", f"not a PNG: {path}"
+    return struct.unpack(">II", header[16:24])
+
+
+def test_pwa_icon_files_have_exact_pixel_dimensions():
+    icon_dir = os.path.join(FRONTEND_DIR, "icons")
+    assert _png_dimensions(os.path.join(icon_dir, "dengbej-192.png")) == (192, 192)
+    assert _png_dimensions(os.path.join(icon_dir, "dengbej-512.png")) == (512, 512)
+
+
+def test_icons_are_reproducibly_derived_from_approved_wordmark():
+    generator = _read(os.path.join(FRONTEND_DIR, "icons", "generate_icons.swift"))
+    assert 'let wordmark = "DENGBÊJ"' in generator
+    assert "#7a3b10" in generator and "#faf9f7" in generator
+    assert "no approved portrait" in generator.lower()
+
+
+def test_every_public_html_page_references_manifest_theme_and_touch_icon():
+    pages = sorted(
+        os.path.join(FRONTEND_DIR, name)
+        for name in os.listdir(FRONTEND_DIR)
+        if name.endswith(".html")
+    )
+    assert pages, "no public HTML pages found"
+    for path in pages:
+        html = _read(path)
+        name = os.path.basename(path)
+        assert '<link rel="manifest" href="/manifest.webmanifest">' in html, f"{name}: manifest missing"
+        assert '<meta name="theme-color" content="#7a3b10">' in html, f"{name}: theme-color missing"
+        assert '<link rel="apple-touch-icon" href="/icons/dengbej-192.png">' in html, f"{name}: touch icon missing"
+
+
+def test_service_worker_registration_is_feature_detected_and_non_fatal():
+    js = _extract_script(_read(INDEX_HTML))
+    assert '"serviceWorker" in navigator' in js
+    assert 'navigator.serviceWorker.register("/sw.js", { scope: "/" })' in js
+    assert ".catch(function()" in js
+    assert "registerServiceWorker();" in js
+
+
+def test_service_worker_never_caches_news_api_or_audio():
+    sw = _read(SERVICE_WORKER)
+    assert 'url.origin !== self.location.origin' in sw, "cross-origin API/audio must bypass SW"
+    assert 'url.pathname.startsWith("/news/")' in sw, "future same-origin news APIs must bypass SW"
+    assert 'request.destination === "audio"' in sw
+    assert "AUDIO_EXTENSION.test(url.pathname)" in sw
+    assert "lambda-url" not in sw, "news API URL must never enter the static cache list"
+    assert "audio_url" not in sw
+
+
+def test_service_worker_uses_network_first_navigation_and_honest_offline_fallback():
+    sw = _read(SERVICE_WORKER)
+    navigate = sw.index('request.mode === "navigate"')
+    assert navigate != -1
+    section = sw[navigate:]
+    assert section.index("fetch(request)") < section.index("caches.match(request)"), \
+        "navigation must be network-first, not stale-cache-first"
+    assert 'const OFFLINE_URL = "/offline.html"' in sw
+    assert "caches.match(OFFLINE_URL)" in sw
+    assert "cache.add(url).catch" in sw, "one cache miss must not break SW installation"
+
+
+def test_offline_state_is_honest_and_bilingual():
+    html = _read(OFFLINE_HTML)
+    assert "You’re offline" in html
+    assert "Tu niha bê înternet î" in html
+    assert "Cached news is not shown as current" in html
+    js = _extract_script(_read(INDEX_HTML))
+    assert "navigator.onLine === false" in js
+    assert "Current stories are unavailable without an internet connection" in js
+    assert r"Tu niha b\u00EA \u00EEnternet \u00EE" in js
+
+
+@pytest.mark.skipif(NODE is None, reason="node not available")
+def test_service_worker_javascript_syntax_valid():
+    result = subprocess.run([NODE, "--check", SERVICE_WORKER], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr

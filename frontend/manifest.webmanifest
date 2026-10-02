@@ -1,0 +1,26 @@
+{
+  "name": "Dengbêj AI",
+  "short_name": "Dengbêj",
+  "description": "Kurdish-first bilingual news radio with AI-assisted summaries and narration.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#faf9f7",
+  "theme_color": "#7a3b10",
+  "lang": "ku",
+  "icons": [
+    {
+      "src": "/icons/dengbej-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/dengbej-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "prefer_related_applications": false
+}
