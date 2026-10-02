@@ -288,18 +288,99 @@
 
     /* ── Responsive ── */
     @media (max-width: 599px) {
+      body { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+      .container {
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+      }
       .site-nav { display: none; }
-      .story-headline { font-size: 1.35rem; }
+      .header-inner { gap: 0.75rem; }
+      .wordmark { font-size: 1.05rem; letter-spacing: 0.12em; }
+      .wordmark-link { min-height: 44px; display: inline-flex; align-items: center; }
+      .lang-toggle { flex-shrink: 0; }
+      .lang-toggle button { min-width: 56px; min-height: 44px; padding: 0.5rem 0.65rem; }
+      .story-headline {
+        font-size: 1.35rem;
+        overflow: visible;
+        overflow-wrap: anywhere;
+        -webkit-line-clamp: unset;
+      }
       .story-rank { font-size: 1.4rem; }
       .listen-area { padding: 1.25rem; }
-      .story-link { margin-left: 0; }
+      .story-link {
+        margin-left: 0;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+      }
       .ci-bejim { font-size: 1.1rem; }
-      .program-choices { flex-direction: column; gap: 0.4rem; }
-      .program-btn { font-size: 0.75rem; padding: 0.4rem 0.75rem; width: 100%; text-align: center; }
+      .program-choices {
+        flex-flow: row nowrap;
+        gap: 0.5rem;
+        overflow-x: auto;
+        overscroll-behavior-inline: contain;
+        scroll-snap-type: inline proximity;
+        scrollbar-width: thin;
+        -webkit-overflow-scrolling: touch;
+        padding: 0.15rem 0 0.55rem;
+      }
+      .program-btn {
+        flex: 0 0 auto;
+        width: auto;
+        min-height: 44px;
+        padding: 0.55rem 1rem;
+        font-size: 0.78rem;
+        text-align: center;
+        white-space: nowrap;
+        scroll-snap-align: start;
+      }
       .beje-row { flex-direction: column; align-items: stretch; gap: 0.75rem; }
-      .beje-btn { width: 100%; }
-      .player-inner { gap: 0.6rem; }
-      .player-title { font-size: 0.78rem; }
+      .beje-btn { width: 100%; min-height: 48px; }
+      .read-more-btn, .retry-btn {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+      }
+      .footer-nav a, .footer-legal a {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+      }
+      .player-bar {
+        height: auto;
+        min-height: 72px;
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      .player-bar .container { width: 100%; }
+      .player-inner { min-height: 72px; gap: 0.5rem; }
+      .player-controls { gap: 0.25rem; }
+      .player-btn { width: 44px; height: 44px; }
+      .player-btn-main { width: 48px; height: 48px; }
+      .player-title { font-size: 0.78rem; margin-bottom: 0; }
+      .player-progress-bar {
+        position: relative;
+        height: 44px;
+        background: transparent;
+        overflow: visible;
+      }
+      .player-progress-bar::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        height: 3px;
+        background: var(--border);
+        border-radius: 2px;
+        transform: translateY(-50%);
+      }
+      .player-progress {
+        position: absolute;
+        left: 0;
+        top: 50%;
+        height: 3px;
+        transform: translateY(-50%);
+      }
       .radio-card { padding: 1.25rem; }
       .radio-card-action { flex-direction: column; align-items: stretch; gap: 0.75rem; }
       .radio-card-script { font-size: 0.88rem; padding: 0.75rem; }

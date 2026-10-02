@@ -100,8 +100,20 @@
 
     /* ── Responsive ── */
     @media (max-width: 599px) {
+      .container {
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+      }
       .site-nav { display: none; }
-      .page-title { font-size: 1.5rem; }
+      .header-inner { gap: 0.75rem; }
+      .wordmark { font-size: 1.05rem; letter-spacing: 0.12em; }
+      .wordmark-link { min-height: 44px; display: inline-flex; align-items: center; }
+      .lang-toggle { flex-shrink: 0; }
+      .lang-toggle button { min-width: 56px; min-height: 44px; padding: 0.5rem 0.65rem; }
+      .page-title { font-size: 1.5rem; overflow-wrap: anywhere; }
+      .back-link, .footer-nav a, .footer-legal a {
+        min-height: 44px; display: inline-flex; align-items: center;
+      }
     }
     @media (min-width: 600px) and (max-width: 899px) { .container { padding: 0 2rem; } }
     @media (prefers-reduced-motion: reduce) {

@@ -744,3 +744,86 @@ def test_desktop_change_does_not_alter_core_behavior_hooks():
     assert "function selectAudioUrl(audioMeta)" in js
     assert "function renderStories(data)" in js
     assert "function renderProgramView(data, programId)" in js
+
+
+# ─── Mobile Web V1 (320px–430px) ────────────────────────────────────────────
+
+def _mobile_media_block(path=INDEX_HTML):
+    """Return the CSS text inside the canonical max-width: 599px block."""
+    css = _extract_style(_read(path))
+    marker = "@media (max-width: 599px)"
+    idx = css.find(marker)
+    assert idx != -1, f"mobile media query missing in {os.path.basename(path)}"
+    brace_start = css.index("{", idx)
+    depth = 0
+    for i in range(brace_start, len(css)):
+        if css[i] == "{":
+            depth += 1
+        elif css[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return css[brace_start + 1:i]
+    raise AssertionError("unterminated mobile media block")
+
+
+def test_mobile_breakpoint_covers_320_to_430_without_touching_tablet():
+    css = _extract_style(_read(INDEX_HTML))
+    assert "@media (max-width: 599px)" in css
+    assert "@media (min-width: 600px) and (max-width: 899px)" in css
+    assert "@media (min-width: 1100px)" in css
+
+
+def test_mobile_program_choices_scroll_horizontally():
+    block = _mobile_media_block()
+    assert "flex-flow: row nowrap" in block
+    assert "overflow-x: auto" in block
+    assert "overscroll-behavior-inline: contain" in block
+    assert "-webkit-overflow-scrolling: touch" in block
+    assert "white-space: nowrap" in block
+    assert "scroll-snap-align: start" in block
+
+
+def test_mobile_primary_controls_meet_minimum_touch_target():
+    block = _mobile_media_block()
+    assert ".lang-toggle button" in block and "min-height: 44px" in block
+    assert ".program-btn" in block
+    assert ".beje-btn { width: 100%; min-height: 48px; }" in block
+    assert ".player-btn { width: 44px; height: 44px; }" in block
+    assert ".player-btn-main { width: 48px; height: 48px; }" in block
+    assert ".read-more-btn, .retry-btn" in block
+    assert ".footer-nav a, .footer-legal a" in block
+
+
+def test_mobile_player_respects_safe_area_and_cannot_cover_content():
+    block = _mobile_media_block()
+    assert "env(safe-area-inset-bottom)" in block
+    assert "body { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }" in block
+    assert ".player-bar" in block
+    assert "padding-bottom: env(safe-area-inset-bottom)" in block
+    assert "min-height: 72px" in block
+
+
+def test_mobile_headlines_remain_readable_without_clamping():
+    block = _mobile_media_block()
+    assert ".story-headline" in block
+    assert "overflow-wrap: anywhere" in block
+    assert "-webkit-line-clamp: unset" in block
+    assert "overflow: visible" in block
+
+
+@pytest.mark.parametrize("name,path", list(NAV_PAGES.items()))
+def test_listener_pages_keep_language_controls_touch_friendly(name, path):
+    block = _mobile_media_block(path)
+    assert ".lang-toggle button" in block, f"{name}: mobile language controls missing"
+    assert "min-height: 44px" in block, f"{name}: mobile targets below 44px"
+
+
+def test_mobile_reduced_motion_and_regional_empty_state_preserved():
+    html = _read(INDEX_HTML)
+    css = _extract_style(html)
+    js = _extract_script(html)
+    assert "@media (prefers-reduced-motion: reduce)" in css
+    assert 'id: "bakur"' in js and 'id: "rojhilat"' in js
+    assert "No current stories" in js
+    assert r"Niha \u00E7\u00EErok n\u00EEnin" in js
+    assert "if (btn.disabled) return" not in js
