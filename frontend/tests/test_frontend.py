@@ -941,3 +941,60 @@ def test_offline_state_is_honest_and_bilingual():
 def test_service_worker_javascript_syntax_valid():
     result = subprocess.run([NODE, "--check", SERVICE_WORKER], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
+
+
+# ─── Media Session progressive enhancement ──────────────────────────────────
+
+def test_media_session_is_feature_detected_and_initialized():
+    js = _extract_script(_read(INDEX_HTML))
+    assert 'return "mediaSession" in navigator' in js
+    assert 'typeof MediaMetadata === "undefined"' in js
+    assert 'typeof navigator.mediaSession.setActionHandler !== "function"' in js
+    assert "setupMediaSession();" in js
+
+
+def test_media_session_exposes_current_program_metadata_and_artwork():
+    js = _extract_script(_read(INDEX_HTML))
+    assert "function updateMediaSessionMetadata(title)" in js
+    assert "navigator.mediaSession.metadata = new MediaMetadata" in js
+    assert "title: title" in js
+    assert 'artist: "Dengb\\u00EAj AI"' in js
+    assert '/icons/dengbej-192.png' in js
+    assert '/icons/dengbej-512.png' in js
+    assert "updateMediaSessionMetadata(playerTitle.textContent)" in js
+
+
+def test_media_session_registers_play_pause_previous_next_actions():
+    js = _extract_script(_read(INDEX_HTML))
+    assert "function setupMediaSession()" in js
+    assert "play: function()" in js
+    assert "audioPlayer.play()" in js
+    assert "pause: function()" in js
+    assert "audioPlayer.pause()" in js
+    assert "previoustrack: playPrevProgram" in js
+    assert "nexttrack: playNextProgram" in js
+    assert "navigator.mediaSession.setActionHandler(action, handlers[action])" in js
+
+
+def test_media_session_updates_playback_state_without_breaking_audio():
+    js = _extract_script(_read(INDEX_HTML))
+    assert '"playbackState" in navigator.mediaSession' in js
+    assert 'audioPlayer.addEventListener("play"' in js
+    assert 'updateMediaSessionPlaybackState("playing")' in js
+    assert 'audioPlayer.addEventListener("pause"' in js
+    assert 'updateMediaSessionPlaybackState("paused")' in js
+    assert 'updateMediaSessionPlaybackState("none")' in js
+    # Existing selection/fallback behavior remains the source of playback URLs.
+    assert "function selectAudioUrl(audioMeta)" in js
+    assert js.count("selectAudioUrl(") >= 4
+
+
+def test_media_session_failures_are_isolated_from_normal_playback():
+    js = _extract_script(_read(INDEX_HTML))
+    metadata = re.search(
+        r"function updateMediaSessionMetadata\(title\) \{(.*?)\n      \}", js, re.DOTALL
+    )
+    setup = re.search(r"function setupMediaSession\(\) \{(.*?)\n      \}", js, re.DOTALL)
+    assert metadata and setup
+    assert "try {" in metadata.group(1) and "catch (e)" in metadata.group(1)
+    assert "try {" in setup.group(1) and "catch (e)" in setup.group(1)

@@ -737,6 +737,15 @@
         playPauseBtn.setAttribute("aria-label", lang === "ku" ? "L\u00EAxe an raweste" : "Play or pause");
         nextBtn.setAttribute("aria-label", lang === "ku" ? "Bernam\u00EAy\u00EA din" : "Next program");
 
+        // Keep lock-screen / notification metadata in the active language.
+        if (audioPlayer.src) {
+          var activeProgram = PROGRAMS.find(function(p) { return p.id === selectedProgram; });
+          playerTitle.textContent = activeProgram
+            ? (lang === "ku" ? activeProgram.label_ku : activeProgram.label_en)
+            : "Dengb\u00EAj";
+          updateMediaSessionMetadata(playerTitle.textContent);
+        }
+
         renderPrograms();
         updateBejeButton();
         updateFreshness();
@@ -1092,12 +1101,71 @@
       }
 
       // ── Audio Player ──
+      // Media Session is progressive enhancement only. Every access is
+      // feature-detected and action registration is isolated so unsupported
+      // browsers/actions cannot affect normal playback.
+      function mediaSessionAvailable() {
+        return "mediaSession" in navigator;
+      }
+
+      function updateMediaSessionMetadata(title) {
+        if (!mediaSessionAvailable() || typeof MediaMetadata === "undefined") return;
+        try {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: title || "Dengb\u00EAj",
+            artist: "Dengb\u00EAj AI",
+            album: "Kurdish-first bilingual news radio",
+            artwork: [
+              { src: "/icons/dengbej-192.png", sizes: "192x192", type: "image/png" },
+              { src: "/icons/dengbej-512.png", sizes: "512x512", type: "image/png" }
+            ]
+          });
+        } catch (e) {
+          // Metadata must never interfere with normal audio playback.
+        }
+      }
+
+      function updateMediaSessionPlaybackState(state) {
+        if (!mediaSessionAvailable() || !("playbackState" in navigator.mediaSession)) return;
+        try {
+          navigator.mediaSession.playbackState = state;
+        } catch (e) {
+          // Older implementations may expose but reject playbackState.
+        }
+      }
+
+      function setupMediaSession() {
+        if (!mediaSessionAvailable() || typeof navigator.mediaSession.setActionHandler !== "function") return;
+        var handlers = {
+          play: function() {
+            if (!audioPlayer.src) return;
+            audioPlayer.play().then(function() {
+              playPauseBtn.innerHTML = "&#9208;";
+            }).catch(function() {});
+          },
+          pause: function() {
+            audioPlayer.pause();
+            playPauseBtn.innerHTML = "&#9654;";
+          },
+          previoustrack: playPrevProgram,
+          nexttrack: playNextProgram
+        };
+        Object.keys(handlers).forEach(function(action) {
+          try {
+            navigator.mediaSession.setActionHandler(action, handlers[action]);
+          } catch (e) {
+            // One unsupported action must not disable the others.
+          }
+        });
+      }
+
       function playAudio(url) {
         if (!url) return;
         playerBar.classList.add("visible");
 
         var prog = PROGRAMS.find(function(p) { return p.id === selectedProgram; });
         playerTitle.textContent = prog ? (currentLang === "ku" ? prog.label_ku : prog.label_en) : "Dengb\u00EAj";
+        updateMediaSessionMetadata(playerTitle.textContent);
 
         if (audioPlayer.src === url && !audioPlayer.paused) {
           audioPlayer.pause();
@@ -1157,6 +1225,13 @@
       prevBtn.addEventListener("click", playPrevProgram);
       nextBtn.addEventListener("click", playNextProgram);
 
+      audioPlayer.addEventListener("play", function() {
+        updateMediaSessionPlaybackState("playing");
+      });
+      audioPlayer.addEventListener("pause", function() {
+        updateMediaSessionPlaybackState("paused");
+      });
+
       audioPlayer.addEventListener("timeupdate", function() {
         if (audioPlayer.duration) {
           playerProgress.style.width = (audioPlayer.currentTime / audioPlayer.duration * 100) + "%";
@@ -1166,6 +1241,7 @@
       audioPlayer.addEventListener("ended", function() {
         playPauseBtn.innerHTML = "&#9654;";
         playerProgress.style.width = "0%";
+        updateMediaSessionPlaybackState("none");
         // Auto-advance to next program
         var prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         if (!prefersReduced) {
@@ -1199,6 +1275,7 @@
 
       // ── Init ──
       registerServiceWorker();
+      setupMediaSession();
       setLanguage(currentLang);
       loadToday(function() {
         probeAvailability();
