@@ -12,7 +12,10 @@ is needed in the Lambda package.
 API docs: https://www.kurdishtts.com/docs/api
 Endpoint: POST https://www.kurdishtts.com/api/tts-proxy
 Auth: x-api-key header
-Output: WAV (PCM 16-bit, mono, 22050 Hz)
+Output: uncompressed PCM WAV, mono, 16-bit. The provider has been observed to
+    emit either 22050 Hz or 24000 Hz depending on the model/voice; both native
+    rates are accepted and preserved as-is. Audio is never resampled, and a
+    24000 Hz stream is never reinterpreted as 22050 Hz.
 """
 
 import io
@@ -63,10 +66,20 @@ def _parse_speed(raw: str) -> float:
 
 KURDISH_TTS_SPEED = _parse_speed(os.environ.get("KURDISH_TTS_SPEED", "1.1"))
 
-# Expected WAV parameters from the API (22050 Hz, mono, 16-bit)
-EXPECTED_SAMPLE_RATE = 22050
+# Expected WAV parameters from the API.
+# The provider emits uncompressed PCM, mono, 16-bit. The sample rate is NOT
+# fixed: 22050 Hz and 24000 Hz have both been observed in production. Accept
+# either native rate and preserve it; reject anything else. Audio is never
+# resampled.
 EXPECTED_CHANNELS = 1
 EXPECTED_SAMPLE_WIDTH = 2  # 16-bit = 2 bytes
+ALLOWED_SAMPLE_RATES = (22050, 24000)
+# PCM/uncompressed WAV reports a compression type of "NONE" via the wave module.
+EXPECTED_COMPTYPE = "NONE"
+
+# Backward-compatible alias: the lowest supported native rate. Retained so
+# existing imports keep working; validation uses ALLOWED_SAMPLE_RATES, not this.
+EXPECTED_SAMPLE_RATE = 22050
 
 # Minimum valid WAV size (44-byte header + at least some PCM data)
 MIN_WAV_SIZE = 100
@@ -287,15 +300,27 @@ def synthesize_chunk(text: str, api_key: str, speaker_id: str = None) -> bytes:
 # ─── WAV Validation and Assembly ─────────────────────────────────────────────
 
 def _validate_wav(data: bytes):
-    """Validate that data is a proper WAV file with expected audio params."""
+    """Validate that data is a proper WAV file with supported audio params.
+
+    Accepts only uncompressed PCM, mono, 16-bit audio at one of the supported
+    native sample rates (22050 Hz or 24000 Hz). Rejects compressed, stereo,
+    non-16-bit, zero-frame, unsupported-rate, or malformed WAV data.
+    """
     try:
         with wave.open(io.BytesIO(data), "rb") as wf:
+            comptype = wf.getcomptype()
+            if comptype != EXPECTED_COMPTYPE:
+                raise TTSError(
+                    f"KurdishTTS WAV is compressed ({comptype}/{wf.getcompname()}), "
+                    f"expected uncompressed PCM ({EXPECTED_COMPTYPE})"
+                )
             if wf.getnchannels() != EXPECTED_CHANNELS:
                 raise TTSError(f"KurdishTTS WAV has {wf.getnchannels()} channels, expected {EXPECTED_CHANNELS}")
             if wf.getsampwidth() != EXPECTED_SAMPLE_WIDTH:
                 raise TTSError(f"KurdishTTS WAV has {wf.getsampwidth()}-byte samples, expected {EXPECTED_SAMPLE_WIDTH}")
-            if wf.getframerate() != EXPECTED_SAMPLE_RATE:
-                raise TTSError(f"KurdishTTS WAV has {wf.getframerate()} Hz, expected {EXPECTED_SAMPLE_RATE}")
+            if wf.getframerate() not in ALLOWED_SAMPLE_RATES:
+                allowed = " or ".join(str(r) for r in ALLOWED_SAMPLE_RATES)
+                raise TTSError(f"KurdishTTS WAV has {wf.getframerate()} Hz, expected {allowed}")
             if wf.getnframes() == 0:
                 raise TTSError("KurdishTTS WAV contains zero audio frames")
     except wave.Error as e:
@@ -308,25 +333,52 @@ def _extract_pcm(wav_data: bytes) -> bytes:
         return wf.readframes(wf.getnframes())
 
 
+def _read_wav_params(wav_data: bytes):
+    """Return the (channels, sampwidth, framerate, comptype) of a WAV buffer."""
+    with wave.open(io.BytesIO(wav_data), "rb") as wf:
+        return (
+            wf.getnchannels(),
+            wf.getsampwidth(),
+            wf.getframerate(),
+            wf.getcomptype(),
+        )
+
+
 def assemble_wav(chunks: list) -> bytes:
     """
     Assemble multiple WAV byte buffers into a single valid WAV file.
 
-    Extracts PCM frames from each chunk, concatenates them, and writes
-    a new WAV with a correct header using Python's standard wave module.
+    The audio parameters (channels, sample width, sample rate, compression)
+    are read from the FIRST validated chunk and used verbatim to write the
+    combined file. Every subsequent chunk must report the exact same
+    parameters; mixed-rate or mixed-format chunks are rejected. Audio is
+    never resampled and a 24000 Hz stream is never relabelled as 22050 Hz.
     """
     if len(chunks) == 1:
         return chunks[0]
 
-    all_pcm = b""
-    for chunk_data in chunks:
+    # Validate and lock the format from the first chunk.
+    _validate_wav(chunks[0])
+    base_channels, base_width, base_rate, base_comptype = _read_wav_params(chunks[0])
+
+    all_pcm = _extract_pcm(chunks[0])
+    for index, chunk_data in enumerate(chunks[1:], start=2):
+        _validate_wav(chunk_data)
+        channels, width, rate, comptype = _read_wav_params(chunk_data)
+        if (channels, width, rate, comptype) != (base_channels, base_width, base_rate, base_comptype):
+            raise TTSError(
+                "KurdishTTS WAV chunk "
+                f"{index} format mismatch: got "
+                f"{channels}ch/{width}B/{rate}Hz/{comptype}, "
+                f"expected {base_channels}ch/{base_width}B/{base_rate}Hz/{base_comptype}"
+            )
         all_pcm += _extract_pcm(chunk_data)
 
     output = io.BytesIO()
     with wave.open(output, "wb") as wf:
-        wf.setnchannels(EXPECTED_CHANNELS)
-        wf.setsampwidth(EXPECTED_SAMPLE_WIDTH)
-        wf.setframerate(EXPECTED_SAMPLE_RATE)
+        wf.setnchannels(base_channels)
+        wf.setsampwidth(base_width)
+        wf.setframerate(base_rate)
         wf.writeframes(all_pcm)
 
     return output.getvalue()
@@ -338,8 +390,11 @@ def synthesize_kurdish(text: str, speaker_id: str = None) -> bytes:
     """
     Synthesize full Kurdish text to WAV, handling chunking for long texts.
 
-    Returns a single valid WAV file (PCM 16-bit, mono, 22050 Hz).
-    Raises TTSError if the API key is missing or synthesis fails.
+    Returns a single valid uncompressed PCM WAV (mono, 16-bit) at the
+    provider's native sample rate (22050 Hz or 24000 Hz), preserved as-is.
+    When the text is chunked, every chunk must share the same format or
+    assembly fails. Raises TTSError if the API key is missing or synthesis
+    fails.
     """
     if speaker_id is None:
         speaker_id = KURDISH_TTS_SPEAKER

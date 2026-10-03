@@ -1157,3 +1157,291 @@ def test_reservation_confirmed_before_synthesis(mock_briefing, mock_program, moc
     mock_refund.assert_called()
     statuses = [r["status"] for r in result["body"]["results"]]
     assert all(s == "skipped" for s in statuses)
+
+
+# ─── WAV sample-rate compatibility (22050 Hz and 24000 Hz) ───────────────────
+# The live provider was observed emitting 24000 Hz PCM while the code only
+# accepted 22050 Hz, causing synthesis to fail with:
+#   "KurdishTTS WAV has 24000 Hz, expected 22050"
+# These tests lock in support for both native rates (mono, 16-bit, PCM) and the
+# strict multi-chunk format-consistency rules (no resampling, no relabelling).
+
+from kurdish_tts import ALLOWED_SAMPLE_RATES, EXPECTED_COMPTYPE  # noqa: E402
+
+# 24000 Hz fixtures (0.1s of PCM at 24000 Hz, 16-bit mono = 2400 frames)
+PCM_24K_A = b"\x01\x00" * 2400
+PCM_24K_B = b"\x02\x00" * 2400
+WAV_24K_A = make_wav(PCM_24K_A, framerate=24000)
+WAV_24K_B = make_wav(PCM_24K_B, framerate=24000)
+
+
+def test_allowed_sample_rates_are_22050_and_24000():
+    assert set(ALLOWED_SAMPLE_RATES) == {22050, 24000}
+    assert EXPECTED_COMPTYPE == "NONE"
+
+
+# --- single-chunk validation ---
+
+def test_validate_wav_accepts_single_chunk_22050():
+    _validate_wav(make_wav(SILENCE_PCM, framerate=22050))  # must not raise
+
+
+def test_validate_wav_accepts_single_chunk_24000():
+    _validate_wav(make_wav(b"\x00\x00" * 2400, framerate=24000))  # must not raise
+
+
+# --- multi-chunk assembly, same native rate ---
+
+def test_assemble_multi_chunk_22050():
+    result = assemble_wav([WAV_A, WAV_B])
+    with wave.open(io.BytesIO(result), "rb") as wf:
+        assert wf.getframerate() == 22050
+        assert wf.getnchannels() == 1
+        assert wf.getsampwidth() == 2
+        assert wf.getnframes() == 2205 + 2205
+        assert wf.readframes(wf.getnframes()) == PCM_A + PCM_B
+
+
+def test_assemble_multi_chunk_24000():
+    result = assemble_wav([WAV_24K_A, WAV_24K_B])
+    with wave.open(io.BytesIO(result), "rb") as wf:
+        assert wf.getframerate() == 24000
+        assert wf.getnchannels() == 1
+        assert wf.getsampwidth() == 2
+        assert wf.getnframes() == 2400 + 2400
+        assert wf.readframes(wf.getnframes()) == PCM_24K_A + PCM_24K_B
+
+
+def test_assembled_wav_retains_24000_rate():
+    """Assembled multi-chunk 24000 Hz audio must stay 24000 Hz, not relabelled."""
+    result = assemble_wav([WAV_24K_A, WAV_24K_B])
+    with wave.open(io.BytesIO(result), "rb") as wf:
+        assert wf.getframerate() == 24000
+    # And the assembled output must itself pass validation at 24000 Hz.
+    _validate_wav(result)
+
+
+def test_single_chunk_24000_passthrough_preserves_rate():
+    """A single 24000 Hz chunk is returned as-is and remains 24000 Hz."""
+    result = assemble_wav([WAV_24K_A])
+    assert result == WAV_24K_A
+    with wave.open(io.BytesIO(result), "rb") as wf:
+        assert wf.getframerate() == 24000
+
+
+# --- mixed-rate / mixed-format rejection ---
+
+def test_assemble_rejects_mixed_sample_rates():
+    """A 22050 chunk followed by a 24000 chunk must be rejected (no resample)."""
+    try:
+        assemble_wav([WAV_A, WAV_24K_A])
+        assert False, "Should have raised TTSError for mixed sample rates"
+    except TTSError as e:
+        msg = str(e).lower()
+        assert "mismatch" in msg or "22050" in str(e) or "24000" in str(e)
+
+
+def test_assemble_rejects_mixed_rate_first_24000_then_22050():
+    try:
+        assemble_wav([WAV_24K_A, WAV_A])
+        assert False, "Should have raised TTSError for mixed sample rates"
+    except TTSError as e:
+        assert "mismatch" in str(e).lower() or "Hz" in str(e)
+
+
+def test_assemble_rejects_mixed_channels():
+    """A mono first chunk and stereo later chunk must be rejected."""
+    stereo = make_wav(b"\x00\x00\x00\x00" * 2205, nchannels=2)
+    try:
+        assemble_wav([WAV_A, stereo])
+        assert False, "Should have raised TTSError"
+    except TTSError:
+        pass
+
+
+# --- unsupported single-chunk rates and formats ---
+
+def test_validate_wav_rejects_16000():
+    try:
+        _validate_wav(make_wav(SILENCE_PCM, framerate=16000))
+        assert False, "Should have raised TTSError"
+    except TTSError as e:
+        assert "16000" in str(e)
+
+
+def test_validate_wav_rejects_44100_still():
+    try:
+        _validate_wav(make_wav(SILENCE_PCM, framerate=44100))
+        assert False, "Should have raised TTSError"
+    except TTSError as e:
+        assert "44100" in str(e)
+
+
+def test_validate_wav_rejects_stereo_24000():
+    bad = make_wav(b"\x00\x00\x00\x00" * 2400, nchannels=2, framerate=24000)
+    try:
+        _validate_wav(bad)
+        assert False, "Should have raised TTSError"
+    except TTSError as e:
+        assert "channel" in str(e).lower()
+
+
+def test_validate_wav_rejects_non_16bit():
+    """8-bit (1-byte) samples must be rejected even at an allowed rate."""
+    bad = make_wav(b"\x00" * 2400, sampwidth=1, framerate=24000)
+    try:
+        _validate_wav(bad)
+        assert False, "Should have raised TTSError"
+    except TTSError as e:
+        assert "byte" in str(e).lower() or "sample" in str(e).lower()
+
+
+def test_validate_wav_rejects_32bit():
+    """32-bit (4-byte) samples must be rejected."""
+    bad = make_wav(b"\x00\x00\x00\x00" * 2400, sampwidth=4, framerate=24000)
+    try:
+        _validate_wav(bad)
+        assert False, "Should have raised TTSError"
+    except TTSError as e:
+        assert "byte" in str(e).lower() or "sample" in str(e).lower()
+
+
+def test_validate_wav_rejects_malformed_wav():
+    try:
+        _validate_wav(b"RIFF\x00\x00\x00\x00WAVEnot-a-real-wav")
+        assert False, "Should have raised TTSError"
+    except TTSError as e:
+        assert "wav" in str(e).lower()
+
+
+def test_validate_wav_rejects_zero_frame_24000():
+    try:
+        _validate_wav(make_wav(b"", framerate=24000))
+        assert False, "Should have raised TTSError"
+    except TTSError as e:
+        assert "zero" in str(e).lower()
+
+
+def _make_mulaw_wav(framerate=24000, data_frames=200) -> bytes:
+    """
+    Build a minimal WAV whose fmt chunk declares µ-law (format code 7), i.e.
+    a compressed/non-PCM stream. Python's `wave` cannot write this, so the
+    bytes are assembled by hand. mono, 8-bit µ-law.
+    """
+    import struct
+    audio_format = 7  # WAVE_FORMAT_MULAW (non-PCM)
+    channels = 1
+    bits_per_sample = 8
+    byte_rate = framerate * channels * bits_per_sample // 8
+    block_align = channels * bits_per_sample // 8
+    data = b"\x7f" * data_frames
+    fmt_chunk = struct.pack(
+        "<HHIIHH", audio_format, channels, framerate, byte_rate, block_align, bits_per_sample
+    )
+    riff = (
+        b"RIFF"
+        + struct.pack("<I", 4 + (8 + len(fmt_chunk)) + (8 + len(data)))
+        + b"WAVE"
+        + b"fmt " + struct.pack("<I", len(fmt_chunk)) + fmt_chunk
+        + b"data" + struct.pack("<I", len(data)) + data
+    )
+    return riff
+
+
+def test_validate_wav_rejects_compressed():
+    """A non-PCM (µ-law, format code 7) WAV must be rejected."""
+    try:
+        _validate_wav(_make_mulaw_wav())
+        assert False, "Should have raised TTSError for compressed WAV"
+    except TTSError as e:
+        assert "compress" in str(e).lower() or "pcm" in str(e).lower() or "wav" in str(e).lower()
+
+
+# --- end-to-end 24000 Hz synthesis + unchanged chunking/payload ---
+
+@patch("kurdish_tts.get_api_key")
+@patch("kurdish_tts.urlopen")
+def test_synthesize_kurdish_multi_chunk_24000(mock_urlopen, mock_key):
+    """Long text at 24000 Hz produces a valid assembled 24000 Hz WAV."""
+    mock_key.return_value = "test-key-123"
+    call_count = [0]
+
+    def side_effect(req, timeout=None):
+        call_count[0] += 1
+        resp = MagicMock()
+        resp.status = 200
+        resp.headers = {"Content-Type": "audio/wav"}
+        resp.read.return_value = WAV_24K_A if call_count[0] % 2 == 1 else WAV_24K_B
+        resp.__enter__ = lambda s: s
+        resp.__exit__ = MagicMock(return_value=False)
+        return resp
+
+    mock_urlopen.side_effect = side_effect
+    text = "Hevok yekem. " * 40  # > 480 chars -> multiple chunks
+    result = synthesize_kurdish(text)
+    assert call_count[0] >= 2
+    with wave.open(io.BytesIO(result), "rb") as wf:
+        assert wf.getframerate() == 24000
+        assert wf.getnchannels() == 1
+        assert wf.getsampwidth() == 2
+
+
+@patch("kurdish_tts.get_api_key")
+@patch("kurdish_tts.urlopen")
+def test_tts_request_payload_unchanged(mock_urlopen, mock_key):
+    """The POST payload shape (text/speaker_id/model_version/format/speed) is unchanged."""
+    mock_key.return_value = "test-key-123"
+    captured = {}
+
+    def side_effect(req, timeout=None):
+        captured["data"] = req.data
+        resp = MagicMock()
+        resp.status = 200
+        resp.headers = {"Content-Type": "audio/wav"}
+        resp.read.return_value = WAV_24K_A
+        resp.__enter__ = lambda s: s
+        resp.__exit__ = MagicMock(return_value=False)
+        return resp
+
+    mock_urlopen.side_effect = side_effect
+    synthesize_chunk("Rojbaş", "test-key-123", "kurmanji_236")
+    import json as _json
+    body = _json.loads(captured["data"].decode("utf-8"))
+    assert body["text"] == "Rojbaş"
+    assert body["speaker_id"] == "kurmanji_236"
+    assert body["format"] == "wav"
+    assert "model_version" in body
+    assert "speed" in body
+
+
+def test_chunking_behavior_unchanged():
+    """Chunking boundaries are unaffected by the sample-rate change."""
+    text = "Hevok yekem. " * 40
+    chunks = chunk_text(text, max_chars=480)
+    assert len(chunks) >= 2
+    for c in chunks:
+        assert len(c) <= 480
+
+
+# ─── Quota refund caveat (documentation guard) ───────────────────────────────
+
+def test_refund_does_not_prove_external_provider_uncounted():
+    """
+    DOCUMENTED CAVEAT: quota.refund() only rolls back the INTERNAL DynamoDB
+    monthly counter. It does NOT prove the external KurdishTTS provider did not
+    count the API call(s) against its own plan/billing. A synthesis that fails
+    AFTER one or more chunk requests have already hit the provider may still
+    have consumed provider-side credits even though the internal reservation
+    was refunded to zero.
+
+    This test documents that caveat and asserts the current refund semantics
+    are intact; it deliberately does NOT redesign quota accounting, since no
+    existing test shows the current internal behavior is unsafe to retain. If
+    provider-side counting must be reconciled, that belongs in a separate,
+    reviewed change to quota accounting.
+    """
+    import quota
+    # Internal refund remains a no-op guard for non-positive values (unchanged).
+    with patch("quota.boto3.resource") as mock_resource:
+        quota.refund(0, "2026-10")
+        mock_resource.assert_not_called()
