@@ -1445,3 +1445,328 @@ def test_refund_does_not_prove_external_provider_uncounted():
     with patch("quota.boto3.resource") as mock_resource:
         quota.refund(0, "2026-10")
         mock_resource.assert_not_called()
+
+
+# ─── Deadline-aware timeout recovery ─────────────────────────────────────────
+# A hard Lambda timeout previously killed synthesis mid-run and left a dangling
+# quota reservation. These tests prove the bounded, deadline-aware behavior:
+# never begin an HTTP attempt (first try or retry) that cannot finish within
+# remaining Lambda time + safety margin; on exhaustion exit through a controlled
+# TTSTimeBudgetError that reports attempted vs. total; retain attempted chars and
+# refund only unattempted chars; never write a partial WAV or audio_url_ku.
+
+from kurdish_tts import (  # noqa: E402
+    Deadline,
+    TTSTimeBudgetError,
+    synthesize_kurdish as _synthesize_kurdish,
+    KURDISH_TTS_TIMEOUT,
+    KURDISH_TTS_SAFETY_MARGIN,
+)
+
+
+class _FakeContext:
+    """Mimics the Lambda context.
+
+    Two modes:
+      * scalar start_s -> every poll returns that many seconds (stable).
+      * list of seconds -> each poll pops the next value; once exhausted, the
+        final value repeats. Lets a test choose the exact reading per poll.
+
+    The deadline is polled a deterministic number of times: synthesize_kurdish
+    polls once per chunk (pre-chunk guard) and synthesize_chunk polls once per
+    HTTP attempt (first try + each retry).
+    """
+    def __init__(self, start_s):
+        if isinstance(start_s, (list, tuple)):
+            self._seq = [float(v) for v in start_s]
+        else:
+            self._seq = [float(start_s)]
+
+    def get_remaining_time_in_millis(self):
+        val = self._seq.pop(0) if len(self._seq) > 1 else self._seq[0]
+        return int(max(0.0, val) * 1000)
+
+
+def test_deadline_none_is_unenforced():
+    """A None context means unlimited time (direct/unit-test usage unchanged)."""
+    d = Deadline(None)
+    assert d.enforced is False
+    assert d.remaining_s() is None
+    assert d.fits(KURDISH_TTS_TIMEOUT) is True
+
+
+def test_deadline_fits_requires_timeout_plus_margin():
+    """fits() is True only when remaining >= http_timeout + safety margin."""
+    need = KURDISH_TTS_TIMEOUT + KURDISH_TTS_SAFETY_MARGIN
+    # Just enough (no decrement -> stable reading)
+    d_ok = Deadline(_FakeContext(need))
+    assert d_ok.fits(KURDISH_TTS_TIMEOUT) is True
+    # One second short
+    d_short = Deadline(_FakeContext(need - 1))
+    assert d_short.fits(KURDISH_TTS_TIMEOUT) is False
+
+
+@patch("kurdish_tts.get_api_key")
+@patch("kurdish_tts.urlopen")
+def test_insufficient_time_before_first_request_zero_calls_full_refund(mock_urlopen, mock_key):
+    """No time for the first chunk -> zero provider calls, attempted_chars=0."""
+    mock_key.return_value = "k"
+    # Long text -> multiple chunks; context reports too little time from the start.
+    text = "Hevok yekem. " * 40
+    too_little = KURDISH_TTS_TIMEOUT + KURDISH_TTS_SAFETY_MARGIN - 1
+    ctx = _FakeContext(too_little)  # stable, always below need
+    try:
+        _synthesize_kurdish(text, deadline=Deadline(ctx))
+        assert False, "expected TTSTimeBudgetError"
+    except TTSTimeBudgetError as e:
+        assert e.attempted_chars == 0
+        assert e.completed_chunks == 0
+        assert e.total_chunks >= 2
+    mock_urlopen.assert_not_called()  # zero provider calls
+
+
+@patch("kurdish_tts.get_api_key")
+@patch("kurdish_tts.urlopen")
+def test_insufficient_time_after_some_chunks_retains_attempted(mock_urlopen, mock_key):
+    """Time for 2 chunks then exhausted -> attempted = first 2 chunk sizes."""
+    mock_key.return_value = "k"
+
+    def ok_resp(req, timeout=None):
+        resp = MagicMock()
+        resp.status = 200
+        resp.headers = {"Content-Type": "audio/wav"}
+        resp.read.return_value = WAV_24K_A
+        resp.__enter__ = lambda s: s
+        resp.__exit__ = MagicMock(return_value=False)
+        return resp
+
+    mock_urlopen.side_effect = ok_resp
+    text = "Hevok yekem. " * 120  # long enough for 3+ chunks at the 480 limit
+    from kurdish_tts import chunk_text
+    chunks = chunk_text(text)
+    assert len(chunks) >= 3
+    need = KURDISH_TTS_TIMEOUT + KURDISH_TTS_SAFETY_MARGIN
+    # Poll order: c1 pre-guard, c1 attempt, c2 pre-guard, c2 attempt, c3 pre-guard.
+    # Fit the first four polls, then starve chunk 3's pre-guard.
+    ctx = _FakeContext([need + 100, need + 100, need + 100, need + 100, need - 1])
+    try:
+        _synthesize_kurdish(text, deadline=Deadline(ctx))
+        assert False, "expected TTSTimeBudgetError"
+    except TTSTimeBudgetError as e:
+        assert e.completed_chunks == 2
+        assert e.attempted_chars == len(chunks[0]) + len(chunks[1])
+        assert e.total_chunks == len(chunks)
+    # Exactly 2 provider calls were made (chunks 1 and 2).
+    assert mock_urlopen.call_count == 2
+
+
+@patch("kurdish_tts.get_api_key")
+@patch("kurdish_tts.urlopen")
+def test_remaining_time_checked_before_retry(mock_urlopen, mock_key):
+    """A first attempt fails transiently; the retry is guarded by remaining time."""
+    mock_key.return_value = "k"
+    from urllib.error import URLError
+    # First attempt raises a retryable URLError; the retry must be time-checked.
+    mock_urlopen.side_effect = URLError("temporary connection reset")
+    need = KURDISH_TTS_TIMEOUT + KURDISH_TTS_SAFETY_MARGIN
+    # Attempt 1 guard fits; after the failure, attempt 2 guard does NOT fit.
+    ctx = _FakeContext([need + 5, need - 1])
+    try:
+        synthesize_chunk("Rojbaş", "k", "kurmanji_236", deadline=Deadline(ctx))
+        assert False, "expected TTSTimeBudgetError on retry guard"
+    except TTSTimeBudgetError:
+        pass
+    # Only the first attempt hit the network; the retry was blocked by the guard.
+    assert mock_urlopen.call_count == 1
+
+
+@patch("kurdish_tts.get_api_key")
+@patch("kurdish_tts.urlopen")
+def test_retry_not_attempted_when_timeout_plus_margin_cannot_fit(mock_urlopen, mock_key):
+    """If no attempt can fit at all, zero network calls occur."""
+    mock_key.return_value = "k"
+    need = KURDISH_TTS_TIMEOUT + KURDISH_TTS_SAFETY_MARGIN
+    ctx = _FakeContext(need - 1)  # first attempt already cannot fit (stable)
+    try:
+        synthesize_chunk("Rojbaş", "k", "kurmanji_236", deadline=Deadline(ctx))
+        assert False, "expected TTSTimeBudgetError"
+    except TTSTimeBudgetError:
+        pass
+    mock_urlopen.assert_not_called()
+
+
+def test_batch_time_budget_exhausted_no_partial_wav_or_url_ku():
+    """Batch handler: on time exhaustion, no S3 upload, no url_ku, partial refund."""
+    from lambda_function import handle_kurdish_batch
+    refunds = []
+
+    def fake_refund(chars, month_key=None):
+        refunds.append(chars)
+
+    script = "Hevok yekem. " * 60  # multi-chunk
+    with patch("lambda_function._get_briefing_for_batch") as mock_brief, \
+         patch("lambda_function._get_program_for_batch", return_value=None), \
+         patch("lambda_function.s3_client") as mock_s3, \
+         patch("lambda_function._update_briefing_ku_audio") as mock_upd, \
+         patch("quota.reserve", return_value=True), \
+         patch("quota.get_usage", return_value=0), \
+         patch("quota.refund", side_effect=fake_refund), \
+         patch.dict("sys.modules", {"kurdish_tts": __import__("kurdish_tts")}):
+        mock_brief.return_value = {
+            "briefing_date": "2026-10-03", "generated_at": "T",
+            "daily_audio_script_ku": script, "daily_audio_meta": {},
+        }
+        import kurdish_tts
+        total = len(kurdish_tts.chunk_text(script))
+        # Deadline fits chunk 1 (pre-guard + attempt), then starves chunk 2's
+        # pre-guard. Poll order: c1 pre-guard, c1 attempt, c2 pre-guard, ...
+        need = kurdish_tts.KURDISH_TTS_TIMEOUT + kurdish_tts.KURDISH_TTS_SAFETY_MARGIN
+        ctx = _FakeContext([need + 50, need + 50, need - 1])
+        with patch("kurdish_tts.get_api_key", return_value="k"), \
+             patch("kurdish_tts.urlopen") as mock_open:
+            def ok(req, timeout=None):
+                r = MagicMock(); r.status = 200; r.headers = {"Content-Type": "audio/wav"}
+                r.read.return_value = WAV_24K_A
+                r.__enter__ = lambda s: s; r.__exit__ = MagicMock(return_value=False)
+                return r
+            mock_open.side_effect = ok
+            result = handle_kurdish_batch({
+                "generate_kurdish_batch": True, "dry_run": False,
+                "date": "2026-10-03", "max_chars": 18000,
+                "request_id": "unit-timebudget",
+            }, ctx)
+
+    body = result["body"]
+    today = [r for r in body["results"] if r["program_id"] == "today"][0]
+    assert today["status"] == "time_budget_exhausted"
+    assert today["attempted_chars"] >= 1
+    assert today["refunded_chars"] == today["chars"] - today["attempted_chars"]
+    assert today["refunded_chars"] >= 0
+    # No partial WAV uploaded, no url_ku written.
+    mock_s3.put_object.assert_not_called()
+    mock_upd.assert_not_called()
+    # Only the unattempted remainder was refunded (never the full reservation here).
+    assert refunds == [today["refunded_chars"]] if today["refunded_chars"] > 0 else refunds == []
+
+
+def test_batch_full_refund_when_time_out_before_any_request():
+    """If no provider request is ever submitted, the full reservation is refunded."""
+    from lambda_function import handle_kurdish_batch
+    refunds = []
+    script = "Hevok yekem. " * 60
+    with patch("lambda_function._get_briefing_for_batch") as mock_brief, \
+         patch("lambda_function._get_program_for_batch", return_value=None), \
+         patch("lambda_function.s3_client") as mock_s3, \
+         patch("lambda_function._update_briefing_ku_audio") as mock_upd, \
+         patch("quota.reserve", return_value=True), \
+         patch("quota.get_usage", return_value=0), \
+         patch("quota.refund", side_effect=lambda chars, month_key=None: refunds.append(chars)):
+        mock_brief.return_value = {
+            "briefing_date": "2026-10-03", "generated_at": "T",
+            "daily_audio_script_ku": script, "daily_audio_meta": {},
+        }
+        import kurdish_tts
+        need = kurdish_tts.KURDISH_TTS_TIMEOUT + kurdish_tts.KURDISH_TTS_SAFETY_MARGIN
+        ctx = _FakeContext(need - 1)  # never enough, from the first chunk (stable)
+        with patch("kurdish_tts.get_api_key", return_value="k"), \
+             patch("kurdish_tts.urlopen") as mock_open:
+            result = handle_kurdish_batch({
+                "generate_kurdish_batch": True, "dry_run": False,
+                "date": "2026-10-03", "max_chars": 18000,
+                "request_id": "unit-timebudget-full",
+            }, ctx)
+            mock_open.assert_not_called()  # zero provider calls
+
+    today = [r for r in result["body"]["results"] if r["program_id"] == "today"][0]
+    assert today["status"] == "time_budget_exhausted"
+    assert today["attempted_chars"] == 0
+    assert today["refunded_chars"] == today["chars"]
+    assert refunds == [today["chars"]]
+    mock_s3.put_object.assert_not_called()
+    mock_upd.assert_not_called()
+
+
+def test_batch_success_retains_full_reservation():
+    """A fully successful synthesis uploads WAV, writes url_ku, refunds nothing."""
+    from lambda_function import handle_kurdish_batch
+    refunds = []
+    script = "Rojbaş. Ev Dengbêj e."  # single chunk
+    with patch("lambda_function._get_briefing_for_batch") as mock_brief, \
+         patch("lambda_function._get_program_for_batch", return_value=None), \
+         patch("lambda_function.s3_client") as mock_s3, \
+         patch("lambda_function._update_briefing_ku_audio") as mock_upd, \
+         patch("quota.reserve", return_value=True), \
+         patch("quota.get_usage", return_value=0), \
+         patch("quota.refund", side_effect=lambda chars, month_key=None: refunds.append(chars)):
+        mock_brief.return_value = {
+            "briefing_date": "2026-10-03", "generated_at": "T",
+            "daily_audio_script_ku": script, "daily_audio_meta": {},
+        }
+        import kurdish_tts
+        # Generous remaining time throughout.
+        ctx = _FakeContext(600)
+        with patch("kurdish_tts.get_api_key", return_value="k"), \
+             patch("kurdish_tts.urlopen") as mock_open:
+            def ok(req, timeout=None):
+                r = MagicMock(); r.status = 200; r.headers = {"Content-Type": "audio/wav"}
+                r.read.return_value = WAV_24K_A
+                r.__enter__ = lambda s: s; r.__exit__ = MagicMock(return_value=False)
+                return r
+            mock_open.side_effect = ok
+            result = handle_kurdish_batch({
+                "generate_kurdish_batch": True, "dry_run": False,
+                "date": "2026-10-03", "max_chars": 18000,
+                "request_id": "unit-success",
+            }, ctx)
+
+    today = [r for r in result["body"]["results"] if r["program_id"] == "today"][0]
+    assert today["status"] == "success"
+    assert "audio_url_ku" in today
+    assert refunds == []  # full reservation retained
+    mock_s3.put_object.assert_called_once()
+    mock_upd.assert_called_once()
+
+
+def test_batch_dry_run_still_no_synthesis_or_writes_with_context():
+    """Dry run performs zero synthesis/quota/S3/DB even when a context is passed."""
+    from lambda_function import handle_kurdish_batch
+    with patch("lambda_function._get_briefing_for_batch") as mock_brief, \
+         patch("lambda_function._get_program_for_batch", return_value=None), \
+         patch("lambda_function.s3_client") as mock_s3, \
+         patch("lambda_function._update_briefing_ku_audio") as mock_upd, \
+         patch("quota.reserve") as mock_reserve, \
+         patch("quota.refund") as mock_refund, \
+         patch("quota.get_usage", return_value=0):
+        mock_brief.return_value = {
+            "briefing_date": "2026-10-03", "generated_at": "T",
+            "daily_audio_script_ku": "Rojbaş. " * 50, "daily_audio_meta": {},
+        }
+        with patch.dict("sys.modules", {"kurdish_tts": MagicMock()}) as _:
+            ku = sys.modules["kurdish_tts"]
+            ku.synthesize_kurdish = MagicMock()
+            result = handle_kurdish_batch({
+                "generate_kurdish_batch": True, "dry_run": True,
+                "date": "2026-10-03", "max_chars": 5000,
+            }, _FakeContext(600))
+            ku.synthesize_kurdish.assert_not_called()
+    assert result["body"]["status"] == "dry_run"
+    mock_s3.put_object.assert_not_called()
+    mock_upd.assert_not_called()
+    mock_reserve.assert_not_called()
+    mock_refund.assert_not_called()
+
+
+def test_direct_synthesize_without_context_unchanged():
+    """Direct synthesize_kurdish with no deadline still works (back-compat)."""
+    with patch("kurdish_tts.get_api_key", return_value="k"), \
+         patch("kurdish_tts.urlopen") as mock_open:
+        def ok(req, timeout=None):
+            r = MagicMock(); r.status = 200; r.headers = {"Content-Type": "audio/wav"}
+            r.read.return_value = FAKE_WAV
+            r.__enter__ = lambda s: s; r.__exit__ = MagicMock(return_value=False)
+            return r
+        mock_open.side_effect = ok
+        out = _synthesize_kurdish("Rojbaş")  # no deadline arg
+    with wave.open(io.BytesIO(out), "rb") as wf:
+        assert wf.getnchannels() == 1
+        assert wf.getframerate() in (22050, 24000)

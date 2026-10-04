@@ -76,7 +76,7 @@ def lambda_handler(event, context):
 
     # Controlled batch: generate Kurdish audio for multiple programs within budget
     if event.get("generate_kurdish_batch") is True:
-        return handle_kurdish_batch(event)
+        return handle_kurdish_batch(event, context)
 
     telemetry = Telemetry()
 
@@ -141,7 +141,7 @@ KURDISH_TTS_SPEAKER = os.environ.get("KURDISH_TTS_SPEAKER", "kurmanji_236")
 BATCH_PRIORITY = ["today", "world", "middle-east", "turkey", "kurdistan", "bakur", "rojava", "basur", "rojhilat"]
 
 
-def handle_kurdish_batch(event):
+def handle_kurdish_batch(event, context=None):
     """
     Generate Kurdish audio for multiple programs within a character budget.
 
@@ -156,6 +156,14 @@ def handle_kurdish_batch(event):
     Prioritizes: today > world > middle-east > turkey > regional programs.
     Skips programs that already have audio_url_ku or have zero stories.
     Stops before exceeding budget. Does not modify English audio fields.
+
+    The Lambda ``context`` (when provided) is used for deadline-aware synthesis:
+    a program is only synthesized while enough Lambda time remains for each
+    outbound KurdishTTS request plus a safety margin. If time runs out mid-way,
+    the handler keeps the characters already attempted (the provider may have
+    billed them) and refunds only the characters that were never submitted —
+    never leaving a dangling reservation or a partial WAV. ``context=None``
+    (unit tests / direct calls) disables deadline enforcement.
     """
     dry_run = event.get("dry_run", True)
     max_chars = event.get("max_chars")
@@ -250,7 +258,8 @@ def handle_kurdish_batch(event):
     # ── EXECUTION PATH (only reached when dry_run is False) ──
     # Synthesis imports are deferred to here so a dry run never touches the
     # synthesis module or its dependencies.
-    from kurdish_tts import synthesize_kurdish
+    from kurdish_tts import synthesize_kurdish, Deadline, TTSTimeBudgetError
+    deadline = Deadline(context)
     results = []
 
     for c in selected:
@@ -282,7 +291,7 @@ def handle_kurdish_batch(event):
             continue
 
         try:
-            audio_data = synthesize_kurdish(c["script"], speaker_id=speaker)
+            audio_data = synthesize_kurdish(c["script"], speaker_id=speaker, deadline=deadline)
             timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
             if c["source"] == "briefing":
@@ -301,6 +310,36 @@ def handle_kurdish_batch(event):
 
             results.append({"program_id": c["program_id"], "chars": c["chars"], "status": "success", "audio_url_ku": audio_url_ku})
             print(f"  Batch: {c['program_id']} synthesized ({c['chars']} chars)")
+
+        except TTSTimeBudgetError as e:
+            # CONTROLLED time-budget exit. No partial WAV was produced and
+            # audio_url_ku is NOT written. Keep the characters already submitted
+            # to the provider (it may have billed them) and refund ONLY the
+            # characters that were never attempted. Then stop the batch — no
+            # further program can fit either.
+            attempted = max(0, min(int(getattr(e, "attempted_chars", 0)), c["chars"]))
+            refunded = c["chars"] - attempted
+            try:
+                if refunded > 0:
+                    quota_refund(refunded, month_key)
+            except Exception:
+                pass
+            results.append({
+                "program_id": c["program_id"],
+                "chars": c["chars"],
+                "status": "time_budget_exhausted",
+                "attempted_chars": attempted,
+                "refunded_chars": refunded,
+                "completed_chunks": int(getattr(e, "completed_chunks", 0)),
+                "total_chunks": int(getattr(e, "total_chunks", 0)),
+            })
+            print(
+                f"  Batch: {c['program_id']} TIME_BUDGET_EXHAUSTED — "
+                f"attempted={attempted} refunded={refunded} "
+                f"completed={getattr(e, 'completed_chunks', 0)}/{getattr(e, 'total_chunks', 0)} chunks; "
+                f"no partial WAV, no url_ku"
+            )
+            break
 
         except Exception as e:
             # Refund the confirmed reservation on failure

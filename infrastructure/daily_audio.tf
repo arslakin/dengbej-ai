@@ -77,7 +77,7 @@ resource "aws_lambda_function" "daily_audio" {
   handler          = "lambda_function.lambda_handler"
   source_code_hash = data.archive_file.daily_audio_zip.output_base64sha256
   runtime          = "python3.11"
-  timeout          = 120
+  timeout          = 600
   memory_size      = 256
   environment {
     variables = {

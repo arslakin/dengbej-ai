@@ -46,6 +46,11 @@ KURDISH_TTS_MODEL = os.environ.get("KURDISH_TTS_MODEL", "v4")
 KURDISH_TTS_MAX_CHARS = int(os.environ.get("KURDISH_TTS_MAX_CHARS", "480"))
 KURDISH_TTS_TIMEOUT = int(os.environ.get("KURDISH_TTS_TIMEOUT", "30"))
 KURDISH_TTS_MAX_RETRIES = int(os.environ.get("KURDISH_TTS_MAX_RETRIES", "2"))
+# Final Lambda safety margin (seconds). An outbound HTTP attempt is only begun
+# when its request timeout plus this margin still fits inside the remaining
+# Lambda execution time, so the function returns a controlled result instead of
+# being killed mid-request by a hard Lambda timeout.
+KURDISH_TTS_SAFETY_MARGIN = int(os.environ.get("KURDISH_TTS_SAFETY_MARGIN", "30"))
 
 # Speed: 0.25–4.0 per API docs; higher = faster. Default 1.1 for natural news pace.
 _SPEED_MIN = 0.25
@@ -65,6 +70,60 @@ def _parse_speed(raw: str) -> float:
 
 
 KURDISH_TTS_SPEED = _parse_speed(os.environ.get("KURDISH_TTS_SPEED", "1.1"))
+
+
+# ─── Deadline awareness ──────────────────────────────────────────────────────
+
+class TTSTimeBudgetError(TTSError):
+    """
+    Raised when there is not enough remaining Lambda execution time to safely
+    begin (or retry) an outbound KurdishTTS request. This is a CONTROLLED exit:
+    it carries exactly how much work was attempted so the caller can keep the
+    characters the provider may have billed and refund only the untouched
+    remainder. No partial audio is ever produced on this path.
+    """
+
+    def __init__(self, message, attempted_chars=0, completed_chunks=0, total_chunks=0):
+        super().__init__(message)
+        self.attempted_chars = attempted_chars
+        self.completed_chunks = completed_chunks
+        self.total_chunks = total_chunks
+
+
+class Deadline:
+    """
+    Wraps a Lambda ``context`` to answer "is there enough time left to start an
+    HTTP attempt whose request timeout is ``http_timeout`` seconds?".
+
+    A ``None`` context means NO deadline enforcement (unlimited time). This
+    keeps direct unit-test and non-Lambda usage working unchanged: callers that
+    do not pass a context behave exactly as before this change.
+    """
+
+    def __init__(self, context=None, safety_margin_s=None):
+        self._context = context
+        self._margin = KURDISH_TTS_SAFETY_MARGIN if safety_margin_s is None else safety_margin_s
+
+    @property
+    def enforced(self) -> bool:
+        return self._context is not None and hasattr(self._context, "get_remaining_time_in_millis")
+
+    def remaining_s(self):
+        """Remaining Lambda time in seconds, or None if unenforced."""
+        if not self.enforced:
+            return None
+        try:
+            return self._context.get_remaining_time_in_millis() / 1000.0
+        except Exception:
+            # If the context cannot report time, do not block synthesis.
+            return None
+
+    def fits(self, http_timeout_s: int) -> bool:
+        """True if an attempt with this HTTP timeout plus the safety margin fits."""
+        remaining = self.remaining_s()
+        if remaining is None:
+            return True  # unenforced -> always allowed
+        return remaining >= (http_timeout_s + self._margin)
 
 # Expected WAV parameters from the API.
 # The provider emits uncompressed PCM, mono, 16-bit. The sample rate is NOT
@@ -201,15 +260,21 @@ def _split_long_sentence(text: str, max_chars: int) -> list:
 
 # ─── API Call (stdlib urllib) ────────────────────────────────────────────────
 
-def synthesize_chunk(text: str, api_key: str, speaker_id: str = None) -> bytes:
+def synthesize_chunk(text: str, api_key: str, speaker_id: str = None, deadline: "Deadline" = None) -> bytes:
     """
     Synthesize a single text chunk via the KurdishTTS API.
     Returns raw WAV bytes.
 
-    Raises TTSError on failure after retries.
+    Raises TTSError on failure after retries. If a ``deadline`` is supplied,
+    the remaining Lambda time is checked before EVERY HTTP attempt (including
+    retries); if the attempt's request timeout plus the safety margin would not
+    fit, a ``TTSTimeBudgetError`` is raised BEFORE any request is sent. A
+    ``None`` deadline disables this check (direct/non-Lambda usage unchanged).
     """
     if speaker_id is None:
         speaker_id = KURDISH_TTS_SPEAKER
+    if deadline is None:
+        deadline = Deadline(None)
 
     payload = json.dumps({
         "text": text,
@@ -221,6 +286,14 @@ def synthesize_chunk(text: str, api_key: str, speaker_id: str = None) -> bytes:
 
     last_error = None
     for attempt in range(1, KURDISH_TTS_MAX_RETRIES + 1):
+        # Deadline guard BEFORE every attempt (first try AND each retry): never
+        # begin an HTTP request we cannot finish inside the Lambda time budget.
+        if not deadline.fits(KURDISH_TTS_TIMEOUT):
+            raise TTSTimeBudgetError(
+                f"Insufficient Lambda time for KurdishTTS attempt "
+                f"(need {KURDISH_TTS_TIMEOUT}s + {deadline._margin}s margin, "
+                f"remaining {deadline.remaining_s():.1f}s)"
+            )
         try:
             req = Request(
                 KURDISH_TTS_ENDPOINT,
@@ -386,36 +459,80 @@ def assemble_wav(chunks: list) -> bytes:
 
 # ─── Full Synthesis (with chunking + WAV assembly) ───────────────────────────
 
-def synthesize_kurdish(text: str, speaker_id: str = None) -> bytes:
+def synthesize_kurdish(text: str, speaker_id: str = None, deadline: "Deadline" = None) -> bytes:
     """
     Synthesize full Kurdish text to WAV, handling chunking for long texts.
 
     Returns a single valid uncompressed PCM WAV (mono, 16-bit) at the
     provider's native sample rate (22050 Hz or 24000 Hz), preserved as-is.
     When the text is chunked, every chunk must share the same format or
-    assembly fails. Raises TTSError if the API key is missing or synthesis
-    fails.
+    assembly fails.
+
+    If a ``deadline`` is supplied, remaining Lambda time is checked before every
+    outbound HTTP attempt (including retries). When time runs out, a
+    ``TTSTimeBudgetError`` is raised carrying ``attempted_chars`` (characters in
+    chunks for which at least one request was submitted — which the provider may
+    have billed), ``completed_chunks`` and ``total_chunks``. No partial WAV is
+    ever produced on that path. A ``None`` deadline means unlimited (direct and
+    non-Lambda usage unchanged). Raises TTSError if the API key is missing or
+    synthesis fails for other reasons.
     """
     if speaker_id is None:
         speaker_id = KURDISH_TTS_SPEAKER
+    if deadline is None:
+        deadline = Deadline(None)
 
     api_key = get_api_key()
 
     chunks = chunk_text(text)
-    print(f"  KurdishTTS: synthesizing {len(text)} chars in {len(chunks)} chunk(s), speaker={speaker_id}")
+    total_chunks = len(chunks)
+    print(f"  KurdishTTS: synthesizing {len(text)} chars in {total_chunks} chunk(s), speaker={speaker_id}")
 
     wav_parts = []
-    total_chars = 0
+    completed_chars = 0   # chars in chunks that fully succeeded
+    attempted_chars = 0   # chars in chunks for which a request was submitted
 
     for i, chunk in enumerate(chunks):
-        print(f"  KurdishTTS chunk {i + 1}/{len(chunks)}: {len(chunk)} chars")
-        wav_data = synthesize_chunk(chunk, api_key, speaker_id)
+        chunk_len = len(chunk)
+        # Pre-chunk deadline guard: if even the first attempt for this chunk
+        # cannot fit, stop BEFORE submitting anything for it. These chars are
+        # not attempted, so the caller refunds them.
+        if not deadline.fits(KURDISH_TTS_TIMEOUT):
+            print(
+                f"  KurdishTTS: time budget exhausted before chunk {i + 1}/{total_chunks}; "
+                f"attempted={attempted_chars} chars, completed={i} chunk(s)"
+            )
+            raise TTSTimeBudgetError(
+                f"Time budget exhausted before chunk {i + 1}/{total_chunks}",
+                attempted_chars=attempted_chars,
+                completed_chunks=i,
+                total_chunks=total_chunks,
+            )
+        print(f"  KurdishTTS chunk {i + 1}/{total_chunks}: {chunk_len} chars")
+        # This chunk's request is about to be submitted -> count as attempted.
+        attempted_chars += chunk_len
+        try:
+            wav_data = synthesize_chunk(chunk, api_key, speaker_id, deadline=deadline)
+        except TTSTimeBudgetError:
+            # A deadline stop fired inside the (first/retry) attempt loop for
+            # this chunk. The request for this chunk never completed; it may or
+            # may not have been billed, so we conservatively keep it attempted.
+            print(
+                f"  KurdishTTS: time budget exhausted during chunk {i + 1}/{total_chunks}; "
+                f"attempted={attempted_chars} chars, completed={i} chunk(s)"
+            )
+            raise TTSTimeBudgetError(
+                f"Time budget exhausted during chunk {i + 1}/{total_chunks}",
+                attempted_chars=attempted_chars,
+                completed_chunks=i,
+                total_chunks=total_chunks,
+            )
         wav_parts.append(wav_data)
-        total_chars += len(chunk)
+        completed_chars += chunk_len
 
     # Assemble into single WAV
     combined = assemble_wav(wav_parts)
-    print(f"  KurdishTTS: assembled WAV {len(combined)} bytes from {total_chars} chars, {len(wav_parts)} part(s)")
+    print(f"  KurdishTTS: assembled WAV {len(combined)} bytes from {completed_chars} chars, {len(wav_parts)} part(s)")
 
     return combined
 
