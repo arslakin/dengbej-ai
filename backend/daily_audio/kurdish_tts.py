@@ -74,20 +74,52 @@ KURDISH_TTS_SPEED = _parse_speed(os.environ.get("KURDISH_TTS_SPEED", "1.1"))
 
 # ─── Deadline awareness ──────────────────────────────────────────────────────
 
-class TTSTimeBudgetError(TTSError):
+class TTSPartialResultError(TTSError):
     """
-    Raised when there is not enough remaining Lambda execution time to safely
-    begin (or retry) an outbound KurdishTTS request. This is a CONTROLLED exit:
-    it carries exactly how much work was attempted so the caller can keep the
-    characters the provider may have billed and refund only the untouched
-    remainder. No partial audio is ever produced on this path.
+    Raised when synthesis fails PART-WAY through, carrying conservative
+    accounting so the caller can refund only the characters that were never
+    submitted to the provider.
+
+    Fields:
+      attempted_chars  — characters in chunks for which at least one HTTP
+                         request was submitted (the provider may have billed
+                         them; retain them in the quota).
+      completed_chunks — number of chunks that fully succeeded before the
+                         failure.
+      total_chunks     — total chunks the text was split into.
+      stage            — a short label of where it failed (e.g.
+                         "time_budget", "chunk_request", "wav_validation",
+                         "assembly").
+
+    No partial audio is ever produced or persisted on any of these paths.
     """
 
-    def __init__(self, message, attempted_chars=0, completed_chunks=0, total_chunks=0):
+    def __init__(self, message, attempted_chars=0, completed_chunks=0,
+                 total_chunks=0, stage="unknown"):
         super().__init__(message)
         self.attempted_chars = attempted_chars
         self.completed_chunks = completed_chunks
         self.total_chunks = total_chunks
+        self.stage = stage
+
+
+class TTSTimeBudgetError(TTSPartialResultError):
+    """
+    Raised when there is not enough remaining Lambda execution time to safely
+    begin (or retry) an outbound KurdishTTS request. A CONTROLLED exit that
+    carries the same partial accounting as its base class (stage="time_budget"
+    by default). No partial audio is ever produced on this path.
+    """
+
+    def __init__(self, message, attempted_chars=0, completed_chunks=0,
+                 total_chunks=0, stage="time_budget"):
+        super().__init__(
+            message,
+            attempted_chars=attempted_chars,
+            completed_chunks=completed_chunks,
+            total_chunks=total_chunks,
+            stage=stage,
+        )
 
 
 class Deadline:
@@ -482,9 +514,26 @@ def synthesize_kurdish(text: str, speaker_id: str = None, deadline: "Deadline" =
     if deadline is None:
         deadline = Deadline(None)
 
-    api_key = get_api_key()
+    # Pre-request setup: key retrieval and chunking happen BEFORE any outbound
+    # provider request. A failure here means nothing was ever submitted, so the
+    # caller must refund the FULL reservation. Surface it as a partial result
+    # with stage="pre_request" and attempted_chars=0 so every failure path flows
+    # through the same structured accounting (never the generic "failed" path).
+    try:
+        api_key = get_api_key()
+        chunks = chunk_text(text)
+    except TTSPartialResultError:
+        raise
+    except TTSError as e:
+        print(f"  KurdishTTS: pre_request failure (no request submitted): {str(e)[:120]}")
+        raise TTSPartialResultError(
+            f"Synthesis setup failed before any request: {str(e)[:160]}",
+            attempted_chars=0,
+            completed_chunks=0,
+            total_chunks=0,
+            stage="pre_request",
+        )
 
-    chunks = chunk_text(text)
     total_chunks = len(chunks)
     print(f"  KurdishTTS: synthesizing {len(text)} chars in {total_chunks} chunk(s), speaker={speaker_id}")
 
@@ -509,7 +558,9 @@ def synthesize_kurdish(text: str, speaker_id: str = None, deadline: "Deadline" =
                 total_chunks=total_chunks,
             )
         print(f"  KurdishTTS chunk {i + 1}/{total_chunks}: {chunk_len} chars")
-        # This chunk's request is about to be submitted -> count as attempted.
+        # The deadline pre-guard above passed, so the first attempt WILL be
+        # submitted. Count this chunk as attempted BEFORE the call: the request
+        # reaches the provider and may be billed even if it later fails.
         attempted_chars += chunk_len
         try:
             wav_data = synthesize_chunk(chunk, api_key, speaker_id, deadline=deadline)
@@ -527,11 +578,44 @@ def synthesize_kurdish(text: str, speaker_id: str = None, deadline: "Deadline" =
                 completed_chunks=i,
                 total_chunks=total_chunks,
             )
+        except TTSError as e:
+            # Any other provider/network/validation failure for THIS chunk after
+            # a request was submitted (HTTP error, connection failure, collapsed
+            # generation, invalid/malformed/mixed WAV). The provider received
+            # this chunk's request, so retain it (and all earlier chunks) as
+            # attempted; the caller refunds only the never-submitted remainder.
+            stage = "wav_validation" if "WAV" in str(e) else "chunk_request"
+            print(
+                f"  KurdishTTS: {stage} failure on chunk {i + 1}/{total_chunks}; "
+                f"attempted={attempted_chars} chars, completed={i} chunk(s): {str(e)[:120]}"
+            )
+            raise TTSPartialResultError(
+                f"Chunk {i + 1}/{total_chunks} failed ({stage}): {str(e)[:160]}",
+                attempted_chars=attempted_chars,
+                completed_chunks=i,
+                total_chunks=total_chunks,
+                stage=stage,
+            )
         wav_parts.append(wav_data)
         completed_chars += chunk_len
 
-    # Assemble into single WAV
-    combined = assemble_wav(wav_parts)
+    # Assemble into single WAV. By here every chunk's request was submitted and
+    # individually validated, so on an assembly/mixed-format failure we retain
+    # ALL submitted characters and refund nothing.
+    try:
+        combined = assemble_wav(wav_parts)
+    except TTSError as e:
+        print(
+            f"  KurdishTTS: assembly failure after {total_chunks} submitted chunk(s); "
+            f"attempted={attempted_chars} chars: {str(e)[:120]}"
+        )
+        raise TTSPartialResultError(
+            f"WAV assembly failed after all {total_chunks} chunk(s) submitted: {str(e)[:160]}",
+            attempted_chars=attempted_chars,
+            completed_chunks=total_chunks,
+            total_chunks=total_chunks,
+            stage="assembly",
+        )
     print(f"  KurdishTTS: assembled WAV {len(combined)} bytes from {completed_chars} chars, {len(wav_parts)} part(s)")
 
     return combined

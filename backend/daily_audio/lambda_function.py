@@ -258,9 +258,15 @@ def handle_kurdish_batch(event, context=None):
     # ── EXECUTION PATH (only reached when dry_run is False) ──
     # Synthesis imports are deferred to here so a dry run never touches the
     # synthesis module or its dependencies.
-    from kurdish_tts import synthesize_kurdish, Deadline, TTSTimeBudgetError
+    from kurdish_tts import (
+        synthesize_kurdish,
+        Deadline,
+        TTSTimeBudgetError,
+        TTSPartialResultError,
+    )
     deadline = Deadline(context)
     results = []
+    time_budget_exhausted = False
 
     for c in selected:
         # FAIL CLOSED: reservation must be confirmed in DynamoDB before any
@@ -290,65 +296,123 @@ def handle_kurdish_batch(event, context=None):
             print(f"  Batch: {c['program_id']} skipped (could not confirm reservation): {str(e)[:80]}")
             continue
 
-        try:
-            audio_data = synthesize_kurdish(c["script"], speaker_id=speaker, deadline=deadline)
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        # Single-refund guard: the reservation for THIS program is refunded at
+        # most once, regardless of which stage fails.
+        settled = {"done": False}
 
-            if c["source"] == "briefing":
-                s3_key = f"daily/{c['briefing_date']}_ku_{timestamp}.wav"
-            else:
-                s3_key = f"programs/{c['program_id']}/{c['briefing_date']}_ku_{timestamp}.wav"
-
-            s3_client.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=audio_data, ContentType="audio/wav")
-            audio_url_ku = f"https://{S3_BUCKET}.s3.amazonaws.com/{s3_key}"
-
-            # Update DynamoDB (only audio_url_ku, never touch audio_url or audio_url_en)
-            if c["source"] == "briefing":
-                _update_briefing_ku_audio(c["briefing_date"], c["generated_at"], audio_url_ku)
-            else:
-                _update_program_ku_audio(c["program_id"], c["briefing_date"], audio_url_ku)
-
-            results.append({"program_id": c["program_id"], "chars": c["chars"], "status": "success", "audio_url_ku": audio_url_ku})
-            print(f"  Batch: {c['program_id']} synthesized ({c['chars']} chars)")
-
-        except TTSTimeBudgetError as e:
-            # CONTROLLED time-budget exit. No partial WAV was produced and
-            # audio_url_ku is NOT written. Keep the characters already submitted
-            # to the provider (it may have billed them) and refund ONLY the
-            # characters that were never attempted. Then stop the batch — no
-            # further program can fit either.
-            attempted = max(0, min(int(getattr(e, "attempted_chars", 0)), c["chars"]))
-            refunded = c["chars"] - attempted
+        def _refund_once(amount):
+            amount = max(0, int(amount))
+            if settled["done"]:
+                return
+            settled["done"] = True
+            if amount <= 0:
+                return
             try:
-                if refunded > 0:
-                    quota_refund(refunded, month_key)
+                quota_refund(amount, month_key)
             except Exception:
                 pass
+
+        # ── Stage 1: synthesis (all provider requests + assembly) ──
+        # A TTSPartialResultError (incl. its TTSTimeBudgetError subclass) carries
+        # conservative accounting: retain the characters already submitted to the
+        # provider, refund only the never-submitted remainder. No partial WAV is
+        # produced and audio_url_ku is NEVER written on any failure path.
+        try:
+            audio_data = synthesize_kurdish(c["script"], speaker_id=speaker, deadline=deadline)
+        except TTSPartialResultError as e:
+            attempted = max(0, min(int(getattr(e, "attempted_chars", 0)), c["chars"]))
+            refunded = c["chars"] - attempted
+            _refund_once(refunded)
+            is_time_budget = isinstance(e, TTSTimeBudgetError)
+            status = "time_budget_exhausted" if is_time_budget else "failed_partial"
             results.append({
                 "program_id": c["program_id"],
                 "chars": c["chars"],
-                "status": "time_budget_exhausted",
+                "status": status,
+                "stage": getattr(e, "stage", "unknown"),
                 "attempted_chars": attempted,
                 "refunded_chars": refunded,
                 "completed_chunks": int(getattr(e, "completed_chunks", 0)),
                 "total_chunks": int(getattr(e, "total_chunks", 0)),
+                "s3_object_created": False,
+                "error": str(e)[:120],
             })
             print(
-                f"  Batch: {c['program_id']} TIME_BUDGET_EXHAUSTED — "
+                f"  Batch: {c['program_id']} {status.upper()} stage={getattr(e, 'stage', '?')} — "
                 f"attempted={attempted} refunded={refunded} "
                 f"completed={getattr(e, 'completed_chunks', 0)}/{getattr(e, 'total_chunks', 0)} chunks; "
                 f"no partial WAV, no url_ku"
             )
-            break
-
+            # Only a time-budget exhaustion means no later program can fit; a
+            # content/provider failure is specific to this program, so continue.
+            if is_time_budget:
+                time_budget_exhausted = True
+                break
+            continue
         except Exception as e:
-            # Refund the confirmed reservation on failure
-            try:
-                quota_refund(c["chars"], month_key)
-            except Exception:
-                pass
-            results.append({"program_id": c["program_id"], "chars": c["chars"], "status": "failed", "error": str(e)[:100]})
-            print(f"  Batch: {c['program_id']} FAILED: {e}")
+            # Unexpected failure BEFORE/within synthesis with no accounting
+            # available: no request is known to have succeeded, so refund fully.
+            _refund_once(c["chars"])
+            results.append({
+                "program_id": c["program_id"], "chars": c["chars"],
+                "status": "failed", "stage": "synthesis",
+                "attempted_chars": 0, "refunded_chars": c["chars"],
+                "s3_object_created": False, "error": str(e)[:120],
+            })
+            print(f"  Batch: {c['program_id']} FAILED (synthesis, full refund): {str(e)[:100]}")
+            continue
+
+        # Synthesis fully succeeded: every chunk was submitted and assembled.
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        if c["source"] == "briefing":
+            s3_key = f"daily/{c['briefing_date']}_ku_{timestamp}.wav"
+        else:
+            s3_key = f"programs/{c['program_id']}/{c['briefing_date']}_ku_{timestamp}.wav"
+        audio_url_ku = f"https://{S3_BUCKET}.s3.amazonaws.com/{s3_key}"
+
+        # ── Stage 2: S3 upload ──
+        # Synthesis completed, so all provider requests happened: retain the FULL
+        # reservation (refund 0) even if the upload fails. No audio_url_ku written.
+        try:
+            s3_client.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=audio_data, ContentType="audio/wav")
+        except Exception as e:
+            _refund_once(0)  # retain full reservation; mark settled (no refund)
+            results.append({
+                "program_id": c["program_id"], "chars": c["chars"],
+                "status": "failed_upload", "stage": "s3_upload",
+                "attempted_chars": c["chars"], "refunded_chars": 0,
+                "s3_object_created": False, "error": str(e)[:120],
+            })
+            print(f"  Batch: {c['program_id']} FAILED (s3_upload, retain full, refund 0): {str(e)[:100]}")
+            continue
+
+        # ── Stage 3: DynamoDB audio_url_ku update ──
+        # Upload succeeded. If the DB write fails, retain the FULL reservation
+        # (refund 0) and REPORT the uploaded S3 object for later reconciliation.
+        try:
+            if c["source"] == "briefing":
+                _update_briefing_ku_audio(c["briefing_date"], c["generated_at"], audio_url_ku)
+            else:
+                _update_program_ku_audio(c["program_id"], c["briefing_date"], audio_url_ku)
+        except Exception as e:
+            _refund_once(0)  # retain full reservation; mark settled (no refund)
+            results.append({
+                "program_id": c["program_id"], "chars": c["chars"],
+                "status": "failed_db_update", "stage": "dynamodb_update",
+                "attempted_chars": c["chars"], "refunded_chars": 0,
+                "s3_object_created": True, "s3_key": s3_key, "audio_url_ku": audio_url_ku,
+                "error": str(e)[:120],
+            })
+            print(
+                f"  Batch: {c['program_id']} FAILED (dynamodb_update, retain full, refund 0) — "
+                f"uploaded S3 object {s3_key} needs reconciliation: {str(e)[:100]}"
+            )
+            continue
+
+        # ── Success ──
+        settled["done"] = True  # full reservation retained; nothing to refund
+        results.append({"program_id": c["program_id"], "chars": c["chars"], "status": "success", "audio_url_ku": audio_url_ku})
+        print(f"  Batch: {c['program_id']} synthesized ({c['chars']} chars)")
 
     chars_consumed = sum(r["chars"] for r in results if r["status"] == "success")
     report["status"] = "completed"
